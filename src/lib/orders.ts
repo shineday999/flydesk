@@ -121,3 +121,22 @@ export async function findOrderByReference(
   );
   return row ? toOrder(row) : null;
 }
+
+/**
+ * 對外回應用的訂單檢視。
+ *
+ * - 一律移除 sessionId：它就是 flydesk_demo cookie 的值，外洩等於交出該工作階段。
+ * - 以訂單編號查詢（任何知道編號的人都能呼叫）時不得回傳旅客個資，
+ *   只有持有該訂單所屬工作階段的人（includePassenger=true）才拿得到護照／電話／Email。
+ */
+export type PublicOrder = Omit<OrderRecord, 'sessionId'>;
+
+export function toPublicOrder(
+  order: OrderRecord,
+  opts: { includePassenger: boolean },
+): PublicOrder {
+  const { sessionId: _sessionId, payload, ...rest } = order;
+  if (opts.includePassenger) return { ...rest, payload };
+  const { passenger: _passenger, ...safePayload } = payload;
+  return { ...rest, payload: safePayload };
+}

@@ -1,4 +1,4 @@
-import { createOrder, findOrderByReference, listOrdersBySession } from '@/lib/orders';
+import { createOrder, findOrderByReference, listOrdersBySession, toPublicOrder } from '@/lib/orders';
 import { getTenantBySlug } from '@/lib/tenants';
 import { createDemoSession, demoCookieOptions, getDemoSession, DEMO_COOKIE } from '@/lib/demo-session';
 import { clientIp, fail, isSameOrigin, json, rateLimit } from '@/lib/http';
@@ -74,7 +74,7 @@ export async function POST(req: Request) {
     },
   });
 
-  const res = json({ order });
+  const res = json({ order: toPublicOrder(order, { includePassenger: true }) });
   if (issueCookie) {
     res.cookies.set(DEMO_COOKIE, sessionId, demoCookieOptions());
   }
@@ -92,13 +92,17 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const reference = clampText(url.searchParams.get('reference') ?? '', 20, '').toUpperCase();
 
+  const sessionId = await getDemoSession(req, tenant.id);
+
   if (reference) {
     const order = await findOrderByReference(reference, tenant.id);
     if (!order) return fail('ORDER_NOT_FOUND', 404);
-    return json({ order });
+    // 編號查詢不需登入，因此只有訂單所屬的工作階段才看得到旅客個資。
+    const owned = sessionId !== null && order.sessionId === sessionId;
+    return json({ order: toPublicOrder(order, { includePassenger: owned }) });
   }
 
-  const sessionId = await getDemoSession(req, tenant.id);
   if (!sessionId) return json({ orders: [] });
-  return json({ orders: await listOrdersBySession(sessionId, tenant.id) });
+  const orders = await listOrdersBySession(sessionId, tenant.id);
+  return json({ orders: orders.map((o) => toPublicOrder(o, { includePassenger: true })) });
 }

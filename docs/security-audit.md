@@ -220,3 +220,27 @@
 |---|---|
 | 2026-11-13 | 初版：OWASP Top 10 與 CWE Top 25 全面評估、部署前清單、硬化項目 |
 | 2026-11-13 | 遷移至 Cloudflare Workers + D1 後複審：執行環境改為 Workers＋D1、憑證改為 secret binding 宣告且任何環境必填、補上 secret 落地性與旗標翻轉順序兩項硬化、部署前清單更新 |
+
+---
+
+## 複審紀錄（2026-11-13）
+
+### 已修正
+
+| 嚴重度 | 問題 | 處置 |
+|---|---|---|
+| 高 | `GET /api/orders?reference=` 不需登入，卻回傳完整訂單：含旅客護照／電話／Email，以及 `sessionId`（即 `flydesk_demo` cookie 的值）。知道或猜中編號的人可取得個資，並用 `sessionId` 冒用該工作階段讀取其所有訂單 | 新增 `toPublicOrder()`：所有回應移除 `sessionId`；編號查詢只有訂單所屬工作階段才回傳 `passenger` |
+| 中 | `clientIp()` 直接信任 `x-forwarded-for` 第一段，攻擊者可隨意偽造，繞過登入與下單的速率限制 | 優先使用 Cloudflare 提供的 `cf-connecting-ip`，其餘僅作本機開發備援 |
+| 中 | `auth.ts` 讀 `globalThis.env`，`db.ts` 讀 `cloudflare:workers` 的 `env`。Workers 上前者不存在，可能出現啟動檢查通過、登入卻讀不到 `ADMIN_PASSWORD` | `auth.ts` 改讀同一個 `env` 來源（保留 `process.env` 備援） |
+
+### 尚未處理（需要決策）
+
+- **速率限制為單一 isolate 的記憶體計數**：Workers 會有多個 isolate，實際上限遠高於設定值。正式上線應改用 Durable Object、KV 或 Cloudflare WAF 規則。
+- **訂單編號熵不足**：6 字元、32 字母表，約 2^30 種組合，搭配上一項限流無效，仍可被枚舉（個資已不再回傳，但訂單存在與否、金額仍可查）。建議加長編號或改為編號＋Email 驗證。
+- **旅客護照以明文存入 D1**；示範用途可接受，接真實訂單前需加密或不存。
+- **`POST /api/orders` 未驗證日期格式與旅客必填欄位**（姓名可為空、`departureDate` 只截長度）。
+- **過期的 `admin_sessions`／`demo_sessions` 只在被讀取時才刪除**，無定期清理，資料表會持續成長。
+- **`npm audit --omit=dev`**：7 項（1 高、6 中），根源為 `next` 內建的 `postcss <= 8.5.22`；修復需升級到 `next@16`（破壞性變更），需另行評估。
+- **CSP 含 `script-src 'unsafe-inline'`**，削弱 XSS 防護。
+- 建立租戶時 `domain` 未驗證格式與唯一性，slug 檢查與寫入之間有競態（資料庫 `UNIQUE` 會擋下，但會回 500 而非 409）。
+- 本文件先前的描述與程式不符：session cookie 一律 `Secure`（非僅 production）、比對函式為 `safeEqual`（非 `timingSafeEqual`）。

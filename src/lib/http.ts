@@ -49,6 +49,10 @@ export function readCookie(req: Request, name: string): string | undefined {
 }
 
 export function clientIp(req: Request): string {
+  // Cloudflare 會覆寫 cf-connecting-ip，用戶端無法偽造；x-forwarded-for 的第一段
+  // 則是用戶端自帶的值，只能在沒有 Cloudflare 的本機開發時當備援。
+  const cf = req.headers.get('cf-connecting-ip');
+  if (cf) return cf.trim();
   const fwd = req.headers.get('x-forwarded-for');
   if (fwd) return fwd.split(',')[0].trim();
   return req.headers.get('x-real-ip') ?? 'unknown';

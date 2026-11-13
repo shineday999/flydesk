@@ -1,3 +1,4 @@
+import { env as workersEnv } from 'cloudflare:workers';
 import { first, nowIso, run } from './db';
 
 /**
@@ -23,10 +24,9 @@ function secret(): string {
 
 /** 同時支援 Workers 綁定與本機環境變數。 */
 function envValue(key: string): string | undefined {
-  const fromWorkers =
-    typeof globalThis !== 'undefined'
-      ? (globalThis as { env?: Record<string, unknown> }).env?.[key]
-      : undefined;
+  // 與 db.ts 的 assertRequiredSecrets 讀同一個來源（cloudflare:workers 的 env）。
+  // 舊寫法讀 globalThis.env，Workers 上並不存在，會讓啟動檢查通過、登入卻讀不到密碼。
+  const fromWorkers = (workersEnv as unknown as Record<string, unknown> | undefined)?.[key];
   if (typeof fromWorkers === 'string') return fromWorkers;
   const fromProcess =
     typeof process !== 'undefined' ? process.env?.[key] : undefined;
