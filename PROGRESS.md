@@ -75,10 +75,11 @@
 
 ### P0（上線前必做）
 
-- [ ] **正式建置驗證**：`npm run build` + `npm start`（目前只驗過 dev server）
-- [ ] **產生正式憑證**：`ADMIN_PASSWORD`（≥16 字元）與 `SESSION_SECRET`
-- [ ] **`npm audit --omit=dev`** 高風險項目歸零（目前安裝時未稽核）
-- [ ] **速率限制改為跨實例方案**：目前是記憶體 Map（`src/lib/http.ts`），多實例部署會失效 → 換 KV / Durable Object
+- [x] **正式建置驗證**：`npm run build` + `npm start`（已於 Workers 線上驗證）
+- [x] **產生正式憑證**：`ADMIN_PASSWORD`（≥16 字元）與 `SESSION_SECRET`（存於 Worker secrets）
+- [x] **`npm audit --omit=dev`** → **0 vulnerabilities**（2026-11-13，以 `overrides` 修正 `postcss` / `fflate`）
+- [x] **登入端速率限制跨實例化**：改存 D1 `login_failures`（每 IP 10 分鐘 5 次、全站 10 分鐘 40 次），已線上實測第 6 次回 429
+- [ ] **公開 API 的速率限制跨實例化**：`src/lib/http.ts` 仍是記憶體 Map（航班搜尋、下單）→ 換 KV / Durable Object
 - [ ] **補審計事件**：`auth.login` / `auth.failed` 寫入 `audit_log`；接上結構化日誌
 
 ### P1（產品完整性）
@@ -220,9 +221,9 @@ journalctl --user -u flydesk-healthcheck.service -n 20
 
 ### 待辦（部署相關）
 
-- [ ] **憑證輪替**：目前 `ADMIN_PASSWORD` / `SESSION_SECRET` 為自動產生，應納入密碼管理與定期輪替
+- [x] **憑證輪替**：正式憑證已產出並記錄於 `/home/abc/.config/flydesk/env`（權限 600）；**定期輪替機制仍未建立**
 - [x] **D1 備份還原流程驗證**：已實測還原（2026-11-13），流程與踩到的坑見下節
-- [ ] **速率限制跨實例化**：目前為記憶體實作（見 `src/lib/http.ts`），Workers 多實例下需改用 KV／Durable Object
+- [x] **速率限制跨實例化（登入端）**：已改用 D1 `login_failures`（2026-11-13）；**公開 API 仍為記憶體實作**
 - [ ] **監控告警**：健康檢查僅寫 journal，尚未接通知管道
 
 ### D1 備份與還原（已實測）
@@ -283,5 +284,49 @@ journalctl --user -u flydesk-healthcheck.service -n 20
 - 2026-11-13 專案已從 monorepo `shineday999/claude-workspace` 抽出為**獨立 repo**
   `https://github.com/shineday999/flydesk.git`（private），原 PR #1 已關閉。
   抽取方式：`git subtree split --prefix=flydesk`（8 筆歷史完整保留，hash 因改寫而變動）
-- 線上版本：`401a7171-e70e-4f6b-aec9-bdb9b6869291`
+- 線上版本：`401a7171-e70e-4f6b-aec9-bdb9b6869291`（初版上線）
+
+---
+
+## 十、安全複審修正與重新部署（2026-11-13）
+
+線上版 Claude 依交棒包做了一輪安全複審，提出 4 個 commit 的修正，已全部套用、驗證並部署。
+原始 patch 保留於 `flydesk-review-fixes.patch`（未進版控）。
+
+| # | 嚴重度 | 問題 | 處置 |
+|---|---|---|---|
+| 1 | 高 | `GET /api/orders?reference=` 不需登入卻回傳完整訂單，含旅客護照／電話／Email 與 `sessionId`（即 cookie 值） | 新增 `toPublicOrder()`：所有回應移除 `sessionId`；編號查詢只有訂單所屬工作階段才回傳 `passenger` |
+| 2 | 中 | `clientIp()` 信任可偽造的 `x-forwarded-for`，可繞過限流 | 改用 Cloudflare 覆寫的 `cf-connecting-ip`，其餘僅作本機備援 |
+| 3 | 中 | `auth.ts` 讀 `globalThis.env`、`db.ts` 讀 `cloudflare:workers`，可能「啟動檢查通過、登入讀不到密碼」 | 統一改讀 `cloudflare:workers` 的 `env` |
+| 4 | 中 | 訂單編號僅 6 碼（約 2^30）可被枚舉；下單未驗證日期與旅客欄位 | 編號改 10 碼（約 2^50）；下單沿用 `validateSearch()` 並要求姓名／電話／Email |
+| 5 | 低 | 過期 session 只在被讀取時才刪；租戶網域未驗證、slug 競態回 500 | 登入與建 session 時順手清理；網域限定合法主機名稱且唯一；競態回 409 |
+| 6 | 高 | 登入限流只在記憶體，Workers 多 isolate 下形同無效 | 登入失敗寫入 D1 `login_failures`：每 IP 10 分鐘 5 次、全站 10 分鐘 40 次 |
+| 7 | 高 | `npm audit --omit=dev` 7 項（1 高 6 中）：`next` 內建 `postcss <= 8.5.22`、`satori` 的 `fflate` | `package.json` 加 `overrides`，audit 歸零 |
+
+### 驗證結果（線上，版本 `62b03c2a`）
+
+| 項目 | 結果 |
+|---|---|
+| `npm audit --omit=dev` / `npm test` / `npm run typecheck` / `npm run build` | 0 vulnerabilities ／ 12/12 ／ 0 error ／ 成功（16 條路由） |
+| 後台登入（正式密碼） | 200；帶 cookie 取租戶清單 200 |
+| 訂單建立 | 200，編號 12 碼，回應不含 `sessionId`、含旅客個資 |
+| **編號查詢（無 cookie）** | 200，不含 `sessionId`、旅客個資已遮蔽（訂單存在與金額仍可見，屬已知限制） |
+| 下單輸入驗證 | 缺姓名 → 400 `INVALID_PASSENGER`；過去日期 → 400 `INVALID_SEARCH` |
+| 租戶網域驗證 | 非法網域 → 400 `INVALID_DOMAIN`；重複 slug → 409 `SLUG_TAKEN` |
+| **D1 跨 isolate 登入限流** | 連續 5 次錯誤後第 6 次 → 429 `RATE_LIMITED` |
+| 正式 D1 資料 | 測試租戶／訂單已清除，回復 2 租戶／2 訂單／0 限流紀錄 |
+
+> ⚠️ **操作陷阱**：登入限流會把管理員自己也鎖住（同一 IP 連錯 5 次就鎖 10 分鐘）。
+> 解鎖：`wrangler d1 execute flydesk --remote --command "DELETE FROM login_failures"`。
+> 測試務必清理，否則管理員會被鎖在門外。
+
+### 過程中的兩個操作陷阱
+
+1. **wrangler OAuth token 會過期**：本次部署前 token 已過期（`expiration_time` 已過），
+   `cf deploy` 回 `Invalid access token [code: 9109]`。解法：先跑 `wrangler whoami`
+   觸發自動刷新，再取新的 `oauth_token` 設為 `CLOUDFLARE_API_TOKEN`。
+2. **`git am` 套用外部 patch**：patch 由外部產生，context 與本地不一致時 `git am` 會報
+   「patch does not apply」但仍可能以 3-way 方式完成，且留下 `next=1` 的殘留狀態。
+   套用後務必驗證：`git log` 確認四個 commit 都在，並用乾淨副本 `git apply --3way`
+   重跑一次比對樹是否一致。
 

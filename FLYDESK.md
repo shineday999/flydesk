@@ -442,11 +442,17 @@ wrangler 4 會從 cwd 向上找 `json→jsonc→toml`。`/home/abc/wrangler.json
 
 ## 9. 待辦（優先順序）
 
-### P0 — 速率限制跨實例化（唯一剩下的實質安全弱點，CWE-362）
+### P0 — 速率限制跨實例化（部分完成）
 
-`src/lib/http.ts:66` 是行程內 `Map<string, Bucket>` 實作。Cloudflare Workers 是多 isolate 部署，
-每個 isolate 各有一份 Map → 攻擊者只要把請求打散到不同 isolate，登入限流（5 次／10 分鐘）就會被稀釋。
+**後台登入已改為跨 isolate 方案**（2026-11-13）：登入失敗寫入 D1 `login_failures`，
+每 IP 10 分鐘 5 次、全站 10 分鐘 40 次。已在線上實測：連續 5 次錯誤後第 6 次回 `429 RATE_LIMITED`。
 
+> ⚠️ **操作陷阱**：這個限流會把管理員自己也鎖住（同一 IP 連錯 5 次就鎖 10 分鐘）。
+> 解鎖方式：`wrangler d1 execute flydesk --remote --command "DELETE FROM login_failures"`。
+> 測試時務必記得清理，否則管理員會被鎖在門外。
+
+**尚未跨實例化的部分**：`src/lib/http.ts:66` 的 `Map<string, Bucket>` 仍服務公開 API
+（航班搜尋、下單）。這些端點風險較低（訂單編號已加長為 12 碼、個資已遮蔽），但仍是弱點。
 改法選項：
 - **KV**（免費方案可用）：`bindings.kv()`，每次請求讀寫計數。延遲較高、計數非嚴格原子。
 - **Durable Objects**（免費方案可用）：強一致計數，但需要 DO class + binding，改動較大。
@@ -511,6 +517,21 @@ wrangler 4 會從 cwd 向上找 `json→jsonc→toml`。`/home/abc/wrangler.json
 | 跨租戶隔離 | meridian 的 cookie 在 aurora 查無訂單；以 aurora 取 meridian 的 offer → 404 `OFFER_NOT_FOUND` |
 | 安全標頭 | CSP、`X-Content-Type-Options`、`X-Frame-Options`、`Referrer-Policy`、`Permissions-Policy`、`Cross-Origin-Opener-Policy` 皆存在 |
 | 後台改設定即時生效 | PATCH `theme.primary` → 前台 `--primary` 立即改變，且機場庫存未被清空（mergeConfig 生效） |
+
+### 線上複審驗證（2026-11-13，版本 `62b03c2a`）
+
+| 項目 | 結果 |
+|---|---|
+| 後台登入（正式環境密碼） | 200 `{"ok":true}`；帶 cookie 取 `/api/admin/tenants` → 200 |
+| 訂單建立 | 200，編號 12 碼（`SB` + 10 碼亂數），回應**不含 `sessionId`**、含旅客個資 |
+| 訂單列表（帶 cookie） | 200，1 筆，**不含 `sessionId`**，含旅客個資 |
+| **編號查詢（無 cookie）** | 200，**不含 `sessionId`**、**旅客個資已遮蔽**；訂單存在與金額仍可見（已知限制） |
+| 下單輸入驗證 | 缺姓名 → 400 `INVALID_PASSENGER`；過去日期 → 400 `INVALID_SEARCH`（`Departure date cannot be in the past.`） |
+| 租戶網域驗證 | 非法網域 → 400 `INVALID_DOMAIN`；重複 slug → 409 `SLUG_TAKEN`；合法 → 201 |
+| **D1 跨 isolate 登入限流** | 連續 5 次錯誤密碼後，第 6 次 → **429 `RATE_LIMITED`**（紀錄存於 D1 `login_failures`） |
+| `npm audit --omit=dev` | **0 vulnerabilities** |
+| `npm test` / `npm run typecheck` / `npm run build` | 12/12 通過 / 0 error / 成功（16 條路由） |
+| 正式 D1 資料 | 測試租戶與測試訂單已清除，回復 2 租戶／2 訂單／0 限流紀錄 |
 
 ### 視覺
 
@@ -614,7 +635,7 @@ wrangler 4 會從 cwd 向上找 `json→jsonc→toml`。`/home/abc/wrangler.json
 | 框架指紋 | ✅ 已緩解 | `poweredByHeader: false` |
 | 錯誤資訊洩漏 | ✅ 已緩解 | API 以代碼字串回應（`INVALID_SEARCH` 等），不回傳堆疊或 SQL |
 | 生產環境密鑰 | ✅ 已緩解 | `SESSION_SECRET` 未設定時 `secret()` 於 production 直接拋錯；`ADMIN_PASSWORD` 未設定時於 production 直接拋錯。Workers 上沒有 `NODE_ENV`，因此改為**任何環境都要求兩個憑證**，缺一即拒絕啟動（`src/lib/db.ts` 的 `assertRequiredSecrets`） |
-| 依賴風險 | ⚠️ 待確認（低） | `npm audit` 於安裝時未執行稽核（`--no-audit`）；正式部署前應執行 `npm audit --omit=dev` 並記錄結果 |
+| 依賴風險 | ✅ 已緩解 | `npm audit --omit=dev` → **0 vulnerabilities**（2026-11-13）。原 7 項（1 高 6 中）來自 `next` 內建的 `postcss <= 8.5.22` 與 `satori` 的 `fflate`，已以 `package.json` 的 `overrides`（`postcss ^8.5.32`、`fflate ^0.8.2`）修正，實際安裝版本 postcss 8.5.32 / fflate 0.8.3 |
 | 開發模式外洩 | ✅ 已緩解 | 程式碼不保留任何預設憑證：任何環境（含本機開發）都必須由環境提供 `ADMIN_PASSWORD` / `SESSION_SECRET`，缺一即拒絕啟動；本機以 `.dev.vars`（已 gitignore）提供 |
 
 #### A06 — 易受攻擊與過時的元件（Vulnerable and Outdated Components）
@@ -699,7 +720,7 @@ wrangler 4 會從 cwd 向上找 `json→jsonc→toml`。`/home/abc/wrangler.json
 - [x] 設定 `ADMIN_PASSWORD`（長度 ≥ 16，勿沿用開發預設值）
 - [x] 設定 `SESSION_SECRET`（`openssl rand -hex 32`；未設定時應用會直接拒絕啟動）
 - [x] 確認正式環境建置（Workers 無 `NODE_ENV`，一律以 Worker secret 注入）
-- [ ] 執行 `npm audit --omit=dev`，高風險項目歸零
+- [x] 執行 `npm audit --omit=dev`，高風險項目歸零 → **0 vulnerabilities**（以 `overrides` 修正 `postcss` / `fflate`，2026-11-13）
 - [x] 執行 `npm run build` 並以正式建置重跑一次端到端流程
 - [x] Cloudflare 層確認 TLS、HSTS 與 WAF 規則
 - [ ] 正式環境是否需要多實例？若是，速率限制改為 KV／Durable Object（見 CWE-362）
@@ -816,12 +837,38 @@ wrangler 4 會從 cwd 向上找 `json→jsonc→toml`。`/home/abc/wrangler.json
 | `7ce6aa8` | 補上 D1 備份還原流程並實測驗證 |
 | `c7655be` | 新增 HANDOFF.md 專案交棒說明 |
 | `5f28a37` | 四份文件合併為單一交棒文件 FLYDESK.md |
-| （最新） | 抽出為獨立 repo，更新文件中的 repo 資訊 |
+| `b05e1a6` | 抽出為獨立 repo，更新文件中的 repo 資訊 |
+| `3ec8576` | 修交棒包腳本產生 zip 的路徑處理 |
+| `8edc50f` | 複審修正 1/4：訂單編號查詢不外洩個資與 `sessionId`、信任 `cf-connecting-ip`、統一憑證讀取來源 |
+| `cc878c6` | 複審修正 2/4：下單沿用 `validateSearch()`、必填旅客欄位、訂單編號加長為 10 碼 |
+| `35190cd` | 複審修正 3/4：清理過期 session、租戶網域驗證與唯一性、slug 競態回 409 |
+| `016e80d` | 複審修正 4/4：登入失敗限流改存 D1、以 `overrides` 修補 `postcss`/`fflate`（audit 歸零） |
+| （最新） | 記錄複審修正的部署與線上驗證結果 |
 
 > 這些 hash 是**抽出獨立 repo 後**的版本（`git subtree split --prefix=flydesk` 會改寫 commit hash）。
 > 在原 monorepo 中對應的 hash 為 `f2ef50b / 908f48b / eb6ec9d / ad82587 / 342084d / 418c63d / e362f06 / 687ce56`。
 
-線上版本：`401a7171-e70e-4f6b-aec9-bdb9b6869291`
+線上版本：`401a7171-e70e-4f6b-aec9-bdb9b6869291`（初版上線）
+→ `62b03c2a-8cb7-425a-bc7c-2ea79972434e`（2026-11-13，含複審修正）
+
+### 安全複審修正（2026-11-13）
+
+線上版 Claude 依交棒包做了一輪安全複審，提出 4 個 commit 的修正，已全部套用並實測。
+修正前的原始 patch 保留在 `flydesk-review-fixes.patch`（未進版控）。修正內容：
+
+1. **訂單編號查詢不外洩個資與 `sessionId`** — 新增 `toPublicOrder()`：
+   所有回應移除 `sessionId`（它就是 `flydesk_demo` cookie 的值），以編號查詢時
+   只有訂單所屬的工作階段才拿得到旅客護照／電話／Email。
+2. **`clientIp()` 信任 `cf-connecting-ip`** — 原本直接信任用戶端可偽造的
+   `x-forwarded-for` 第一段，等於可繞過限流。
+3. **`auth.ts` 與 `db.ts` 讀同一個 env 來源** — 原本 `auth.ts` 讀 `globalThis.env`，
+   在 Workers 上不存在，可能出現「啟動檢查通過、登入卻讀不到密碼」。
+4. **下單輸入驗證與編號熵** — 沿用 `validateSearch()`（日期不得為過去、人數上限、
+   行程類型），並要求姓名／電話／有效 Email；訂單編號由 6 碼改為 10 碼（約 2^50）。
+5. **過期 session 清理、租戶網域驗證與唯一性、slug 競態改回 409**。
+6. **登入失敗限流改存 D1** — 這是 §9 P0 的「速率限制跨實例化」在登入端的實作。
+7. **`npm audit --omit=dev` 歸零** — 以 `package.json` 的 `overrides` 修正
+   `postcss` 與 `fflate`。
 
 ### 從 monorepo 抽出的過程
 
