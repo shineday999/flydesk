@@ -64,7 +64,7 @@ export function TransferView({
             className="input"
             value={reference}
             maxLength={20}
-            placeholder="SBXXXXXX"
+            placeholder="SBXXXXXXXXXX"
             onChange={(e) => setReference(e.target.value)}
             required
           />

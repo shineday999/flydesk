@@ -2,7 +2,7 @@ import { createOrder, findOrderByReference, listOrdersBySession, toPublicOrder }
 import { getTenantBySlug } from '@/lib/tenants';
 import { createDemoSession, demoCookieOptions, getDemoSession, DEMO_COOKIE } from '@/lib/demo-session';
 import { clientIp, fail, isSameOrigin, json, rateLimit } from '@/lib/http';
-import { clampText } from '@/lib/config';
+import { clampText, validateSearch } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,8 +35,30 @@ export async function POST(req: Request) {
 
   const search = (body.search ?? {}) as Record<string, unknown>;
   const passenger = (body.passenger ?? {}) as Record<string, unknown>;
-  const adults = Number(search.adults);
-  const count = Number.isInteger(adults) && adults >= 1 && adults <= tenant.config.booking.maxAdults ? adults : 1;
+  const tripType = search.tripType === 'roundtrip' ? 'roundtrip' : 'one-way';
+  const departureDate = clampText(search.departureDate, 20, '');
+  const returnDate = clampText(search.returnDate, 20, '');
+
+  // 與航班搜尋同一套規則：日期格式、不得為過去、來回順序、人數上限、行程類型。
+  const errors = validateSearch(tenant.config, {
+    origin: offer.origin,
+    destination: offer.destination,
+    tripType,
+    departureDate,
+    returnDate,
+    adults: search.adults,
+  });
+  if (errors.length) return fail('INVALID_SEARCH', 400, errors.join(' '));
+  const count = Number(search.adults);
+
+  const name = clampText(passenger.name, 80, '');
+  const phone = clampText(passenger.phone, 32, '');
+  const email = clampText(passenger.email, 120, '');
+  if (!name) return fail('INVALID_PASSENGER', 400, 'Passenger name is required.');
+  if (!phone) return fail('INVALID_PASSENGER', 400, 'Phone is required.');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return fail('INVALID_PASSENGER', 400, 'A valid email is required.');
+  }
 
   const total = offer.price * count + tenant.config.booking.serviceFee;
 
@@ -57,17 +79,17 @@ export async function POST(req: Request) {
       search: {
         origin: offer.origin,
         destination: offer.destination,
-        tripType: search.tripType === 'roundtrip' ? 'roundtrip' : 'one-way',
-        departureDate: clampText(search.departureDate, 20, ''),
-        returnDate: clampText(search.returnDate, 20, ''),
+        tripType,
+        departureDate,
+        returnDate: tripType === 'roundtrip' ? returnDate : '',
         adults: count,
       },
       offer,
       passenger: {
-        name: clampText(passenger.name, 80, ''),
+        name,
         passport: clampText(passenger.passport, 32, ''),
-        phone: clampText(passenger.phone, 32, ''),
-        email: clampText(passenger.email, 120, ''),
+        phone,
+        email,
         luggage: clampText(passenger.luggage, 60, ''),
         notes: clampText(passenger.notes, 200, ''),
       },

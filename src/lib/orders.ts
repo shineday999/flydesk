@@ -46,7 +46,9 @@ function toOrder(row: OrderRow): OrderRecord {
 
 function makeReference(): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const bytes = new Uint8Array(6);
+  // 10 碼 × 32 字母表 ≈ 2^50 種組合；字母表長度剛好 32，取餘數不會有偏差。
+  // （舊的 6 碼編號仍可查詢，查詢是整串比對。）
+  const bytes = new Uint8Array(10);
   crypto.getRandomValues(bytes);
   let out = '';
   for (const b of bytes) out += alphabet[b % alphabet.length];
