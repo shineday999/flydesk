@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 export function getDb(): DatabaseSync {
   if (db) return db;
+  assertProductionEnv();
   const dir = path.dirname(DB_PATH);
   if (dir && dir !== '.' && !DB_PATH.startsWith(':memory:')) {
     mkdirSync(dir, { recursive: true });
@@ -98,4 +99,23 @@ export function closeDb(): void {
 
 export function nowIso(): string {
   return new Date().toISOString();
+}
+
+/**
+ * 正式環境必要憑證檢查。
+ * `next start` 階段由 next.config.ts 先擋一次；此處是執行期保險，
+ * 確保任何啟動方式都不會以預設密碼上線。
+ */
+export function assertProductionEnv(): void {
+  if (process.env.NODE_ENV !== 'production') return;
+  const missing: string[] = [];
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!adminPassword || adminPassword.length < 8) missing.push('ADMIN_PASSWORD (>=8 chars)');
+  if (!sessionSecret || sessionSecret.length < 16) missing.push('SESSION_SECRET (>=16 chars)');
+  if (missing.length > 0) {
+    throw new Error(
+      `[flydesk] Refusing to serve production traffic without: ${missing.join(', ')}`,
+    );
+  }
 }

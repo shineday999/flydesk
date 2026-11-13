@@ -1,6 +1,23 @@
 import type { NextConfig } from 'next';
 
 /**
+ * 正式環境啟動檢查（僅在 `next start` 階段執行，建置不受影響）。
+ * 缺少必要憑證時直接拒絕啟動，避免以預設密碼上線。
+ */
+if (process.env.NEXT_PHASE === 'phase-production-server') {
+  const missing: string[] = [];
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const sessionSecret = process.env.SESSION_SECRET;
+  if (!adminPassword || adminPassword.length < 8) missing.push('ADMIN_PASSWORD (>=8 chars)');
+  if (!sessionSecret || sessionSecret.length < 16) missing.push('SESSION_SECRET (>=16 chars)');
+  if (missing.length > 0) {
+    throw new Error(
+      `[flydesk] Refusing to start in production without: ${missing.join(', ')}`,
+    );
+  }
+}
+
+/**
  * 安全標頭（OWASP A05 / A03）。
  * frame-ancestors 'self' 允許後台預覽用 iframe 內嵌自己的租戶頁面。
  */
