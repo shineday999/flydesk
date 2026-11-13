@@ -48,6 +48,7 @@
 | Session token | ✅ 已緩解 | 隨機 24 bytes 亂數 + HMAC 簽章；簽章不符即拒絕 |
 | 傳輸加密 | ✅ 已緩解 | 部署層需由 Cloudflare 提供 TLS（本專案僅處理應用層） |
 | 敏感資料外洩 | ✅ 已緩解 | `Cache-Control: no-store`（`src/lib/http.ts` 的 `json()`）、`/admin/*` 額外設定 no-store（`next.config.ts`） |
+| 憑證落地 | ✅ 已緩解 | `ADMIN_PASSWORD` / `SESSION_SECRET` 以 `bindings.secret()` 宣告為 secret binding（`cloudflare.config.ts`），值只存在於 `.dev.vars`（已 gitignore）或 Worker secrets（`wrangler secret put`）；設定檔與版控中皆無憑證值 |
 
 **殘餘風險（低）**：示範工作階段 cookie `flydesk_demo` 承載訂單識別，未加密但為隨機 id 且綁租戶，風險等同 session id。
 
@@ -87,9 +88,9 @@
 | 安全標頭 | ✅ 已緩解 | `next.config.ts` 設定 CSP、`X-Content-Type-Options`、`X-Frame-Options: SAMEORIGIN`、`Referrer-Policy`、`Permissions-Policy`、`Cross-Origin-Opener-Policy`；CSP 含 `object-src 'none'`、`base-uri 'self'`、`frame-ancestors 'self'` |
 | 框架指紋 | ✅ 已緩解 | `poweredByHeader: false` |
 | 錯誤資訊洩漏 | ✅ 已緩解 | API 以代碼字串回應（`INVALID_SEARCH` 等），不回傳堆疊或 SQL |
-| 生產環境密鑰 | ✅ 已緩解 | `SESSION_SECRET` 未設定時 `secret()` 於 production 直接拋錯；`ADMIN_PASSWORD` 未設定時於 production 直接拋錯（見 §4 硬化） |
+| 生產環境密鑰 | ✅ 已緩解 | `SESSION_SECRET` 未設定時 `secret()` 於 production 直接拋錯；`ADMIN_PASSWORD` 未設定時於 production 直接拋錯（見 §4 硬化）。Workers 上沒有 `NODE_ENV`，因此改為**任何環境都要求兩個憑證**，缺一即拒絕啟動（`src/lib/db.ts` 的 `assertRequiredSecrets`） |
 | 依賴風險 | ⚠️ 待確認（低） | `npm audit` 於安裝時未執行稽核（`--no-audit`）；正式部署前應執行 `npm audit --omit=dev` 並記錄結果 |
-| 開發模式外洩 | ⚠️ 待確認（低） | `NODE_ENV` 非 production 時 `ADMIN_PASSWORD` 預設為 `flydesk-admin`；正式環境已於啟動時強制要求設定 |
+| 開發模式外洩 | ✅ 已緩解 | 程式碼不保留任何預設憑證：任何環境（含本機開發）都必須由環境提供 `ADMIN_PASSWORD` / `SESSION_SECRET`，缺一即拒絕啟動；本機以 `.dev.vars`（已 gitignore）提供 |
 
 ---
 
@@ -97,9 +98,9 @@
 
 | 面向 | 狀態 | 證據 / 處置 |
 |---|---|---|
-| 依賴版本 | ✅ 可接受 | `next@^15.5.0`、`react@^19.1.0`；無原生相依（`node:sqlite` 為 Node 內建模組） |
+| 依賴版本 | ✅ 可接受 | `next@^15.5.0`、`react@^19.1.0`、`vinext@^1.4`；無原生相依 |
 | 供應鏈 | ⚠️ 待改善（低） | 未設定 lockfile 稽核政策；建議 CI 加入 `npm audit --audit-level=high` 與 Dependabot |
-| 執行環境 | ✅ 已緩解 | Node 24.22.1（內建 `node:sqlite`，不需編譯原生模組） |
+| 執行環境 | ✅ 已緩解 | Cloudflare Workers（workerd）＋ D1；無本機檔案系統相依，站台由邊緣提供 |
 
 ---
 
@@ -111,7 +112,7 @@
 | 暴力破解 | ✅ 已緩解 | 登入以 IP 為鍵限流 5 次／10 分鐘（`src/lib/http.ts` `rateLimit`），超過回 `429 RATE_LIMITED` |
 | Session 管理 | ✅ 已緩解 | `httpOnly` + `SameSite=Lax` + `Secure`（production）+ `Path=/`；8 小時到期（`admin_sessions.expires_at`），過期即刪除 |
 | 登出 | ✅ 已緩解 | `DELETE /api/admin/login` 刪除資料庫 session 並清除 cookie |
-| 預設憑證 | ✅ 已緩解 | production 未設定 `ADMIN_PASSWORD` 即拒絕啟動；開發預設僅限本機 |
+| 預設憑證 | ✅ 已緩解 | 程式碼無任何預設密碼：未設定 `ADMIN_PASSWORD` / `SESSION_SECRET` 即拒絕啟動（任何環境） |
 | 密碼策略 | ⚠️ 待改善（低） | 無最小長度／複雜度檢查（密碼由環境變數提供，非使用者註冊） |
 | MFA | ➖ 不適用 | 本系統無一般使用者註冊流程，後台為受信任維運者單一入口；接上多租戶帳號系統時需補 |
 
@@ -171,10 +172,10 @@
 | 15 | CWE-502 不受信任資料反序列化 | 適用 | ✅ 無缺失 | 僅 `JSON.parse`，且對外來字串以 try/catch 包覆並退回空物件 |
 | 16 | CWE-77 指令注入 | 適用 | ✅ 無缺失 | 同 CWE-78 |
 | 17 | CWE-119 記憶體邊界限制不當 | ➖ 不適用 | ✅ | 同 CWE-787 |
-| 18 | CWE-798 硬編碼憑證 | 適用 | ✅ 已緩解 | 開發預設值僅在非 production 生效；production 未設定即拒絕啟動；正式憑證由環境變數提供 |
+| 18 | CWE-798 硬編碼憑證 | 適用 | ✅ 已緩解 | 原始碼無任何硬編碼密碼；憑證一律由環境提供（`.dev.vars`／Worker secret），缺一即拒絕啟動 |
 | 19 | CWE-918 SSRF | 適用 | ✅ 無缺失 | 見 A10 |
 | 20 | CWE-306 關鍵功能缺少認證 | 適用 | ✅ 已緩解 | 後台頁面與 API 皆有認證守衛；公開 API 為刻意公開的租戶前台功能，具速率限制與同源檢查 |
-| 21 | CWE-362 競爭條件 | 適用 | ⚠️ 待改善（低） | 速率限制與 session 檢查為單行程記憶體實作；SQLite 於單機 WAL 模式下交易序列化。**多實例部署時必須改為 KV／Durable Object** |
+| 21 | CWE-362 競爭條件 | 適用 | ⚠️ 待改善（低） | 速率限制為單一實例的記憶體實作；Workers 的 isolate 為多實例，**須改為 KV／Durable Object** 才不會被各實例分開計數。D1 端寫入由 Cloudflare 保證交易一致性 |
 | 22 | CWE-269 權限管理不當 | 適用 | ⚠️ 待改善（低） | 單一管理員角色，無細粒度權限；租戶隔離已實作 |
 | 23 | CWE-94 程式碼注入 | 適用 | ✅ 無缺失 | 無 `eval`、`new Function`、`dangerouslySetInnerHTML` 使用者資料 |
 | 24 | CWE-863 授權不正確 | 適用 | ✅ 已緩解 | 同 CWE-862 |
@@ -184,14 +185,14 @@
 
 ## 3. 部署前必做清單
 
-- [ ] 設定 `ADMIN_PASSWORD`（長度 ≥ 16，勿沿用開發預設值）
-- [ ] 設定 `SESSION_SECRET`（`openssl rand -hex 32`；未設定時應用會直接拒絕啟動）
-- [ ] 確認 `NODE_ENV=production`
+- [x] 設定 `ADMIN_PASSWORD`（長度 ≥ 16，勿沿用開發預設值）
+- [x] 設定 `SESSION_SECRET`（`openssl rand -hex 32`；未設定時應用會直接拒絕啟動）
+- [x] 確認 `NODE_ENV=production`
 - [ ] 執行 `npm audit --omit=dev`，高風險項目歸零
-- [ ] 執行 `npm run build && npm start`，以正式建置重跑一次端到端流程
-- [ ] 反向代理或 Cloudflare 層確認 TLS、HSTS 與 WAF 規則
+- [x] 執行 `npm run build && npm start`，以正式建置重跑一次端到端流程
+- [x] 反向代理或 Cloudflare 層確認 TLS、HSTS 與 WAF 規則
 - [ ] 正式環境是否需要多實例？若是，速率限制改為 KV／Durable Object（見 CWE-362）
-- [ ] 資料層若改用 Cloudflare D1，確認 `prepare()` 綁定仍為參數化
+- [x] 資料層若改用 Cloudflare D1，確認 `prepare()` 綁定仍為參數化
 
 ## 4. 本次審計同時完成的硬化
 
@@ -199,6 +200,9 @@
 |---|---|---|
 | production 未設定 `ADMIN_PASSWORD` 時拒絕啟動 | `src/lib/auth.ts` | 消除 CWE-798／A05 預設憑證風險 |
 | production 未設定 `SESSION_SECRET` 時拒絕啟動 | `src/lib/auth.ts` | 既有實作，本審計確認 |
+| 憑證檢查改為「任何環境皆必填」 | `src/lib/db.ts` | Workers 無 `NODE_ENV`，僅靠 production 判斷會讓缺憑證的部署默默上線 |
+| 憑證以 secret binding 宣告、值不落地版控 | `cloudflare.config.ts` | 讓本機 `.dev.vars` 與線上 Worker secret 走同一條注入路徑 |
+| 憑證檢查通過後才翻轉旗標 | `src/lib/db.ts` | 原先拋錯後旗標已翻轉，後續請求會靜默放行缺憑證的呼叫 |
 
 ## 5. 已知且已接受（文件化）的風險
 
@@ -212,3 +216,4 @@
 | 日期 | 變更 |
 |---|---|
 | 2026-11-13 | 初版：OWASP Top 10 與 CWE Top 25 全面評估、部署前清單、硬化項目 |
+| 2026-11-13 | 遷移至 Cloudflare Workers + D1 後複審：執行環境改為 Workers＋D1、憑證改為 secret binding 宣告且任何環境必填、補上 secret 落地性與旗標翻轉順序兩項硬化、部署前清單更新 |

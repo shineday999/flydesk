@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   }
 
   const slug = req.headers.get('x-tenant-slug') ?? '';
-  const tenant = getTenantBySlug(slug);
+  const tenant = await getTenantBySlug(slug);
   if (!tenant || tenant.status !== 'active') return fail('TENANT_NOT_FOUND', 404);
 
   let body: unknown = null;

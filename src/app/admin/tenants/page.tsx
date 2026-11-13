@@ -8,12 +8,12 @@ export const dynamic = 'force-dynamic';
 
 export default async function TenantsPage() {
   const store = await cookies();
-  const user = verifyAdminSession(store.get(SESSION_COOKIE)?.value);
+  const user = await verifyAdminSession(store.get(SESSION_COOKIE)?.value);
   if (!user) redirect('/admin');
 
-  ensureSeeded();
-  const tenants = listTenants();
-  const audit = listAudit(12);
+  await ensureSeeded();
+  const tenants = await listTenants();
+  const audit = await listAudit(12);
 
   return (
     <>

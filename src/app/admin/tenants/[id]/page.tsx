@@ -8,11 +8,11 @@ export const dynamic = 'force-dynamic';
 
 export default async function TenantEditPage({ params }: { params: Promise<{ id: string }> }) {
   const store = await cookies();
-  const user = verifyAdminSession(store.get(SESSION_COOKIE)?.value);
+  const user = await verifyAdminSession(store.get(SESSION_COOKIE)?.value);
   if (!user) redirect('/admin');
 
   const { id } = await params;
-  const tenant = getTenantById(id);
+  const tenant = await getTenantById(id);
   if (!tenant) notFound();
 
   return <TenantEditor tenant={tenant} />;

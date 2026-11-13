@@ -21,11 +21,13 @@ export async function POST(req: Request) {
   }
 
   const password = typeof body.password === 'string' ? body.password : '';
-  if (!password || !safeEqual(hashPassword(password), hashPassword(adminPassword()))) {
+  const provided = await hashPassword(password);
+  const expected = await hashPassword(adminPassword());
+  if (!password || !safeEqual(provided, expected)) {
     return fail('INVALID_CREDENTIALS', 401);
   }
 
-  const token = createAdminSession('admin', ip);
+  const token = await createAdminSession('admin', ip);
   const res = json({ ok: true });
   res.cookies.set(SESSION_COOKIE, token, adminCookieOptions());
   return res;
@@ -33,13 +35,13 @@ export async function POST(req: Request) {
 
 export async function DELETE(req: Request) {
   if (!isSameOrigin(req)) return fail('ORIGIN_MISMATCH', 403);
-  destroyAdminSession(readCookie(req, SESSION_COOKIE));
+  await destroyAdminSession(readCookie(req, SESSION_COOKIE));
   const res = json({ ok: true });
   res.cookies.set(SESSION_COOKIE, '', { ...adminCookieOptions(), maxAge: 0 });
   return res;
 }
 
 export async function GET(req: Request) {
-  const user = verifyAdminSession(readCookie(req, SESSION_COOKIE));
+  const user = await verifyAdminSession(readCookie(req, SESSION_COOKIE));
   return json({ authenticated: Boolean(user), user });
 }

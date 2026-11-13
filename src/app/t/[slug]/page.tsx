@@ -10,8 +10,8 @@ export const dynamic = 'force-dynamic';
 /** 租戶首頁：緊湊的 hero + 路線摘要，單屏可見。 */
 export default async function TenantHome({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  ensureSeeded();
-  const tenant = getTenantBySlug(slug);
+  await ensureSeeded();
+  const tenant = await getTenantBySlug(slug);
   if (!tenant) notFound();
 
   const config = tenant.config;

@@ -1,0 +1,12 @@
+# 本機開發用憑證範本。
+#
+#   cp .dev.vars.example .dev.vars   # .dev.vars 已被 .gitignore 排除，不會進版控
+#
+# 長度限制：ADMIN_PASSWORD 至少 8 字元、SESSION_SECRET 至少 16 字元，
+# 缺任何一個都會讓頁面直接拒絕啟動（見 src/lib/db.ts 的 assertRequiredSecrets）。
+#
+# 注意：這兩個名稱必須同時宣告在 cloudflare.config.ts 的 env（bindings.secret()），
+# 未宣告的變數不會被注入 worker 的 env，本機開發會讀不到值。
+
+ADMIN_PASSWORD=change-me-local-password
+SESSION_SECRET=change-me-local-session-secret-at-least-32-chars

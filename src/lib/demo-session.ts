@@ -1,5 +1,4 @@
-import { randomBytes } from 'node:crypto';
-import { getDb, nowIso } from './db';
+import { first, nowIso, run } from './db';
 import { readCookie } from './http';
 
 /**
@@ -12,39 +11,44 @@ import { readCookie } from './http';
 export const DEMO_COOKIE = 'flydesk_demo';
 const TTL_MS = 12 * 60 * 60 * 1000;
 
-export function createDemoSession(
+export async function createDemoSession(
   tenantId: string,
   ip: string | null,
   userAgent: string | null,
-): string {
-  const id = randomBytes(18).toString('hex');
+): Promise<string> {
+  const bytes = new Uint8Array(18);
+  crypto.getRandomValues(bytes);
+  const id = [...bytes].map((b) => b.toString(16).padStart(2, '0')).join('');
   const now = Date.now();
-  getDb()
-    .prepare(
-      `INSERT INTO demo_sessions (id, tenant_id, ip, user_agent, created_at, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
+  await run(
+    `INSERT INTO demo_sessions (id, tenant_id, ip, user_agent, created_at, expires_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [
       id,
       tenantId,
       ip,
       userAgent,
       new Date(now).toISOString(),
       new Date(now + TTL_MS).toISOString(),
-    );
+    ],
+  );
   return id;
 }
 
-export function getDemoSession(req: Request, tenantId: string): string | null {
+export async function getDemoSession(
+  req: Request,
+  tenantId: string,
+): Promise<string | null> {
   const id = readCookie(req, DEMO_COOKIE);
   if (!id) return null;
-  const row = getDb()
-    .prepare('SELECT id, tenant_id, expires_at FROM demo_sessions WHERE id = ?')
-    .get(id) as unknown as { id: string; tenant_id: string; expires_at: string } | undefined;
+  const row = await first<{ id: string; tenant_id: string; expires_at: string }>(
+    'SELECT id, tenant_id, expires_at FROM demo_sessions WHERE id = ?',
+    [id],
+  );
   if (!row) return null;
   if (row.tenant_id !== tenantId) return null;
   if (new Date(row.expires_at).getTime() < Date.now()) {
-    getDb().prepare('DELETE FROM demo_sessions WHERE id = ?').run(row.id);
+    await run('DELETE FROM demo_sessions WHERE id = ?', [row.id]);
     return null;
   }
   return row.id;
@@ -55,7 +59,7 @@ export function demoCookieOptions() {
     name: DEMO_COOKIE,
     httpOnly: true,
     sameSite: 'lax' as const,
-    secure: process.env.NODE_ENV === 'production',
+    secure: true,
     path: '/',
     maxAge: Math.floor(TTL_MS / 1000),
   };

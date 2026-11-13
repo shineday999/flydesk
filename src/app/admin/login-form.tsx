@@ -19,7 +19,7 @@ export function LoginForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as Record<string, any>;
       if (!res.ok) {
         setError(data.code === 'RATE_LIMITED' ? '嘗試過多，請稍後再試' : '密碼錯誤');
         return;

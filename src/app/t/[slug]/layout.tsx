@@ -9,8 +9,8 @@ export const dynamic = 'force-dynamic';
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  ensureSeeded();
-  const tenant = getTenantBySlug(slug);
+  await ensureSeeded();
+  const tenant = await getTenantBySlug(slug);
   if (!tenant) return { title: 'Not found' };
   const { brand } = tenant.config;
   return {
@@ -29,8 +29,8 @@ export default async function TenantLayout({
   params: Promise<{ slug: string }>;
 }) {
   const { slug } = await params;
-  ensureSeeded();
-  const tenant = getTenantBySlug(slug);
+  await ensureSeeded();
+  const tenant = await getTenantBySlug(slug);
   if (!tenant || tenant.status !== 'active') notFound();
 
   const config = tenant.config;

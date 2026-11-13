@@ -115,7 +115,7 @@ export function BookingFlow({
         headers: { 'Content-Type': 'application/json', 'x-tenant-slug': slug },
         body: JSON.stringify(search),
       });
-      const data = await res.json();
+      const data = (await res.json()) as Record<string, any>;
       if (!res.ok) {
         setError(data.message ?? data.code ?? t('common.error'));
         return;
@@ -140,7 +140,7 @@ export function BookingFlow({
         headers: { 'Content-Type': 'application/json', 'x-tenant-slug': slug },
         body: JSON.stringify({ search, offerId: offer.id, passenger }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as Record<string, any>;
       if (!res.ok) {
         setError(data.message ?? data.code ?? t('common.error'));
         return;

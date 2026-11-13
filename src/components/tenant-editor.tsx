@@ -69,7 +69,7 @@ export function TenantEditor({ tenant }: { tenant: Tenant }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ config }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as Record<string, any>;
       if (!res.ok) {
         setToast({ kind: 'err', text: data.code ?? '儲存失敗' });
         return;

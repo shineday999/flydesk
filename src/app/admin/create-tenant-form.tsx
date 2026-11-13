@@ -21,7 +21,7 @@ export function CreateTenantForm() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ slug, name, domain }),
       });
-      const data = await res.json();
+      const data = (await res.json()) as Record<string, any>;
       if (!res.ok) {
         setError(data.code ?? '建立失敗');
         return;

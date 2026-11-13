@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 async function requireAdmin(): Promise<string | null> {
   const store = await cookies();
-  return verifyAdminSession(store.get(SESSION_COOKIE)?.value);
+  return await verifyAdminSession(store.get(SESSION_COOKIE)?.value);
 }
 
 /** 更新租戶設定（整份 config 覆寫，寫入前一律重新消毒）。 */
@@ -18,7 +18,7 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   if (!user) return fail('UNAUTHORIZED', 401);
 
   const { id } = await ctx.params;
-  const tenant = getTenantById(id);
+  const tenant = await getTenantById(id);
   if (!tenant) return fail('TENANT_NOT_FOUND', 404);
 
   let body: Record<string, unknown> = {};
@@ -29,18 +29,18 @@ export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }>
   }
 
   if (body.status === 'suspended' || body.status === 'active') {
-    setTenantStatus(tenant.id, body.status);
-    writeAudit(tenant.id, user, 'tenant.status', body.status);
+    await setTenantStatus(tenant.id, body.status);
+    await writeAudit(tenant.id, user, 'tenant.status', body.status);
   }
 
   if (body.config === undefined) {
-    return json({ tenant: getTenantById(tenant.id) });
+    return json({ tenant: await getTenantById(tenant.id) });
   }
 
   // 合併語意：只更新後台實際送出的欄位，機場/航班等未送出的資料保留。
   const config = mergeConfig(tenant.config, body.config);
-  const updated = updateTenantConfig(tenant.id, config);
-  writeAudit(tenant.id, user, 'tenant.update', `brand=${config.brand.name}`);
+  const updated = await updateTenantConfig(tenant.id, config);
+  await writeAudit(tenant.id, user, 'tenant.update', `brand=${config.brand.name}`);
   return json({ tenant: updated });
 }
 
@@ -48,7 +48,7 @@ export async function GET(_req: Request, ctx: { params: Promise<{ id: string }> 
   const user = await requireAdmin();
   if (!user) return fail('UNAUTHORIZED', 401);
   const { id } = await ctx.params;
-  const tenant = getTenantById(id);
+  const tenant = await getTenantById(id);
   if (!tenant) return fail('TENANT_NOT_FOUND', 404);
   return json({ tenant });
 }

@@ -19,29 +19,40 @@ Flydesk 把「訂票系統」拆成兩層：
 
 ```bash
 npm install
-npm run dev          # http://localhost:4310
+npm run dev          # http://localhost:4310（workerd + 本機 D1）
 ```
 
-首次啟動會自動建立 `.data/flydesk.db`（Node 內建 `node:sqlite`，零原生相依）
-並寫入兩個示範租戶：
+資料庫為 Cloudflare D1（本機開發使用 wrangler 的本機狀態）。首次啟動會依
+`src/lib/seed-config.ts` 自動建立兩個示範租戶：
 
 - `/t/meridian` — 藍綠色、雙語（`zh-TW` / `id-ID`）、桃園／高雄 → 曼谷／新加坡
 - `/t/aurora` — 靛藍色、置中版面、`zh-TW` / `en-US`、奧斯陸 → 曼谷、接送功能關閉
 
-後台在 `/admin`，預設密碼 `flydesk-admin`（可用環境變數 `ADMIN_PASSWORD` 覆蓋；
-正式環境未設定 `ADMIN_PASSWORD` 會直接拒絕啟動）。
+後台在 `/admin`。憑證一律由環境提供（程式碼不保留任何預設值），缺少 `ADMIN_PASSWORD`
+或 `SESSION_SECRET` 時應用會直接拒絕啟動：
 
 ```bash
-export ADMIN_PASSWORD='your-strong-password'
-export SESSION_SECRET="$(openssl rand -hex 32)"   # production 必填
+# 本機開發：複製範本後自行填值（.dev.vars 不進版控）
+cp .dev.vars.example .dev.vars
+
+# Workers 正式環境：以 secret 形式設定
+wrangler secret put ADMIN_PASSWORD --name flydesk
+wrangler secret put SESSION_SECRET --name flydesk
 ```
+
+> `ADMIN_PASSWORD` / `SESSION_SECRET` 同時必須宣告在 `cloudflare.config.ts` 的 `env`
+> （`bindings.secret()`）。Workers 本機開發只會把 `.dev.vars` 的值對應到**已宣告的
+> binding**；沒有宣告，變數就不會進 worker 的 `env`，開發時會讀不到憑證而整片 500。
 
 | 指令 | 說明 |
 |---|---|
-| `npm run dev` | 開發伺服器（port 4310） |
-| `npm run build` / `npm start` | 生產建置／啟動 |
+| `npm run dev` | 開發伺服器（Vite + workerd + 本機 D1，port 4310） |
+| `npm run build` / `npm start` | 生產建置／本機預覽 |
+| `npm run deploy` | 部署到 Cloudflare Workers |
 | `npm test` | 單元測試（`node --test`，12 項） |
 | `npm run typecheck` | TypeScript 檢查 |
+| `npm run cf:types` | 產生 Workers 型別（`.cloudflare/types`） |
+| `npm run d1:schema` / `npm run d1:seed` | 套用 D1 schema / 寫入示範租戶 |
 
 ---
 
@@ -54,7 +65,7 @@ export SESSION_SECRET="$(openssl rand -hex 32)"   # production 必填
 3. **路徑** — `/t/{slug}`
 4. **預設租戶** — `DEFAULT_TENANT_SLUG` 環境變數，未設定則取第一個租戶
 
-> 根路徑 `/` 會依主機名稱自動轉址到對應租戶，部署到 Cloudflare Pages 時，
+> 根路徑 `/` 會依主機名稱自動轉址到對應租戶，部署到 Cloudflare Workers 時，
 > 只要綁不同自訂網域即可對應不同品牌，不需要改程式。
 
 ### 設定結構（`src/lib/config.ts`）
@@ -131,7 +142,7 @@ interface TenantConfig {
 
 ## 資料層
 
-預設使用 Node 內建 `node:sqlite`（`src/lib/db.ts`），schema：
+資料層為 Cloudflare D1（`src/lib/db.ts`，介面只有 all / first / run / batch），schema：
 
 ```
 tenants(id, slug, name, domain, status, plan, config JSON, created_at, updated_at)
@@ -141,9 +152,8 @@ orders(id, tenant_id, session_id, reference, status, currency, total, payload JS
 audit_log(id, tenant_id, actor, action, detail, created_at)
 ```
 
-**換成 Cloudflare D1**：只需替換 `src/lib/db.ts` 與 `src/lib/orders.ts` 內的
-`prepare/bind` 呼叫，其餘程式碼不動。D1 部署時請把 `node:sqlite` 相關程式碼
-抽成 repository 介面。
+D1 schema 定義於 `migrations/0001_init.sql`，示範租戶由 `scripts/seed-d1.mjs`
+寫入。資料層介面刻意保持極簡，日後若要換成其他資料庫，只需改 `src/lib/db.ts`。
 
 ---
 
@@ -155,9 +165,8 @@ audit_log(id, tenant_id, actor, action, detail, created_at)
 | 租戶 | `https://sabre.us.ci/t/meridian`、`https://sabre.us.ci/t/aurora` |
 | 後台 | `https://sabre.us.ci/admin` |
 
-架構：Cloudflare Tunnel → 1kw 主機上的 Next.js production server（user systemd 服務
-`flydesk.service` + `cloudflared-flydesk.service`）。部署細節見
-[`PROGRESS.md`](PROGRESS.md#八線上部署已上線)。
+架構：Cloudflare Workers（vinext 建置）→ D1，站台由 Cloudflare 邊緣提供，
+不依賴任何自家主機。部署細節見 [`PROGRESS.md`](PROGRESS.md#八線上部署已上線)。
 
 ## 文件
 

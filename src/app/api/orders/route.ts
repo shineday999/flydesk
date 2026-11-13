@@ -6,9 +6,9 @@ import { clampText } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
 
-function tenantFrom(req: Request) {
+async function tenantFrom(req: Request) {
   const slug = req.headers.get('x-tenant-slug') ?? '';
-  const tenant = getTenantBySlug(slug);
+  const tenant = await getTenantBySlug(slug);
   return tenant && tenant.status === 'active' ? tenant : null;
 }
 
@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   const ip = clientIp(req);
   if (!rateLimit(`order:${ip}`, 20, 60_000)) return fail('RATE_LIMITED', 429);
 
-  const tenant = tenantFrom(req);
+  const tenant = await tenantFrom(req);
   if (!tenant) return fail('TENANT_NOT_FOUND', 404);
 
   let body: Record<string, unknown> = {};
@@ -40,14 +40,14 @@ export async function POST(req: Request) {
 
   const total = offer.price * count + tenant.config.booking.serviceFee;
 
-  let sessionId = getDemoSession(req, tenant.id);
+  let sessionId = await getDemoSession(req, tenant.id);
   let issueCookie = false;
   if (!sessionId) {
-    sessionId = createDemoSession(tenant.id, ip, req.headers.get('user-agent'));
+    sessionId = await createDemoSession(tenant.id, ip, req.headers.get('user-agent'));
     issueCookie = true;
   }
 
-  const order = createOrder({
+  const order = await createOrder({
     tenantId: tenant.id,
     sessionId,
     currency: offer.currency,
@@ -86,19 +86,19 @@ export async function GET(req: Request) {
   const ip = clientIp(req);
   if (!rateLimit(`orders:${ip}`, 120, 60_000)) return fail('RATE_LIMITED', 429);
 
-  const tenant = tenantFrom(req);
+  const tenant = await tenantFrom(req);
   if (!tenant) return fail('TENANT_NOT_FOUND', 404);
 
   const url = new URL(req.url);
   const reference = clampText(url.searchParams.get('reference') ?? '', 20, '').toUpperCase();
 
   if (reference) {
-    const order = findOrderByReference(reference, tenant.id);
+    const order = await findOrderByReference(reference, tenant.id);
     if (!order) return fail('ORDER_NOT_FOUND', 404);
     return json({ order });
   }
 
-  const sessionId = getDemoSession(req, tenant.id);
+  const sessionId = await getDemoSession(req, tenant.id);
   if (!sessionId) return json({ orders: [] });
-  return json({ orders: listOrdersBySession(sessionId, tenant.id) });
+  return json({ orders: await listOrdersBySession(sessionId, tenant.id) });
 }

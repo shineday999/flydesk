@@ -8,14 +8,14 @@ export const dynamic = 'force-dynamic';
 
 async function requireAdmin(): Promise<string | null> {
   const store = await cookies();
-  return verifyAdminSession(store.get(SESSION_COOKIE)?.value);
+  return await verifyAdminSession(store.get(SESSION_COOKIE)?.value);
 }
 
 export async function GET() {
   const user = await requireAdmin();
   if (!user) return fail('UNAUTHORIZED', 401);
-  ensureSeeded();
-  return json({ tenants: listTenants() });
+  await ensureSeeded();
+  return json({ tenants: await listTenants() });
 }
 
 /** 新增租戶。 */
@@ -36,10 +36,10 @@ export async function POST(req: Request) {
   if (!slug) return fail('INVALID_SLUG', 400, 'Slug must be a-z 0-9 and dash');
   if (!name) return fail('INVALID_NAME', 400);
 
-  const existing = listTenants().find((t) => t.slug === slug);
+  const existing = (await listTenants()).find((t) => t.slug === slug);
   if (existing) return fail('SLUG_TAKEN', 409);
 
-  const tenant = createTenant({
+  const tenant = await createTenant({
     slug,
     name,
     domain: clampText(body.domain, 120, '') || null,
@@ -47,6 +47,6 @@ export async function POST(req: Request) {
     config: normalizeConfig(body.config),
   });
 
-  writeAudit(tenant.id, user, 'tenant.create', `slug=${tenant.slug}`);
+  await writeAudit(tenant.id, user, 'tenant.create', `slug=${tenant.slug}`);
   return json({ tenant }, { status: 201 });
 }

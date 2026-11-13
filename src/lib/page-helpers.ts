@@ -5,8 +5,8 @@ import { resolveLocale } from './locale';
 
 /** 頁面共用的載入流程：取租戶 → 決定語系 → 解析文案。 */
 export async function loadTenantPage(slug: string) {
-  ensureSeeded();
-  const tenant = getTenantBySlug(slug);
+  await ensureSeeded();
+  const tenant = await getTenantBySlug(slug);
   if (!tenant || tenant.status !== 'active') notFound();
   const config = tenant.config;
   const locale = await resolveLocale(config.locales, config.defaultLocale);

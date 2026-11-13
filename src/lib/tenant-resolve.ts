@@ -8,29 +8,29 @@ import type { Tenant } from './tenants';
  *  3. 路徑 /t/{slug}
  *  4. 預設租戶
  */
-export function resolveTenantFromHost(hostHeader: string | null): Tenant | null {
+export async function resolveTenantFromHost(hostHeader: string | null): Promise<Tenant | null> {
   if (!hostHeader) return null;
   const host = hostHeader.split(':')[0].toLowerCase();
   if (!host) return null;
 
-  const byDomain = getTenantByDomain(host);
+  const byDomain = await getTenantByDomain(host);
   if (byDomain) return byDomain;
 
   const labels = host.split('.');
   if (labels.length >= 3) {
     const subdomain = labels[0];
-    const bySlug = getTenantBySlug(subdomain);
+    const bySlug = await getTenantBySlug(subdomain);
     if (bySlug) return bySlug;
   }
   return null;
 }
 
-export function defaultTenant(): Tenant | null {
+export async function defaultTenant(): Promise<Tenant | null> {
   const preferred = process.env.DEFAULT_TENANT_SLUG;
   if (preferred) {
-    const tenant = getTenantBySlug(preferred);
+    const tenant = await getTenantBySlug(preferred);
     if (tenant) return tenant;
   }
-  const all = listTenants();
-  return all.length ? getTenantBySlug(all[0].slug) : null;
+  const all = await listTenants();
+  return all.length ? await getTenantBySlug(all[0].slug) : null;
 }

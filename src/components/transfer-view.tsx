@@ -39,7 +39,7 @@ export function TransferView({
         `/api/orders?reference=${encodeURIComponent(reference.trim().toUpperCase())}`,
         { headers: { 'x-tenant-slug': slug } },
       );
-      const data = await res.json();
+      const data = (await res.json()) as Record<string, any>;
       if (!res.ok) {
         setError(data.code === 'ORDER_NOT_FOUND' ? t('orders.empty') : t('common.error'));
         return;

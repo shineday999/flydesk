@@ -45,7 +45,7 @@ export function OrdersView({
     let alive = true;
     fetch('/api/orders', { headers: { 'x-tenant-slug': slug } })
       .then(async (res) => {
-        const data = await res.json();
+        const data = (await res.json()) as Record<string, any>;
         if (!res.ok) throw new Error(data.code ?? 'ERROR');
         if (alive) setOrders(data.orders ?? []);
       })

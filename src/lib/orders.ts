@@ -1,5 +1,4 @@
-import { randomBytes, randomUUID } from 'node:crypto';
-import { getDb, nowIso } from './db';
+import { all, first, nowIso, run } from './db';
 
 export interface OrderRecord {
   id: string;
@@ -47,29 +46,28 @@ function toOrder(row: OrderRow): OrderRecord {
 
 function makeReference(): string {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  const bytes = randomBytes(6);
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
   let out = '';
   for (const b of bytes) out += alphabet[b % alphabet.length];
   return `SB${out}`;
 }
 
-export function createOrder(input: {
+export async function createOrder(input: {
   tenantId: string;
   sessionId: string;
   currency: string;
   total: number;
   status?: string;
   payload: Record<string, unknown>;
-}): OrderRecord {
-  const id = randomUUID();
+}): Promise<OrderRecord> {
+  const id = crypto.randomUUID();
   const reference = makeReference();
   const created = nowIso();
-  getDb()
-    .prepare(
-      `INSERT INTO orders (id, tenant_id, session_id, reference, status, currency, total, payload, created_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    )
-    .run(
+  await run(
+    `INSERT INTO orders (id, tenant_id, session_id, reference, status, currency, total, payload, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
       id,
       input.tenantId,
       input.sessionId,
@@ -79,7 +77,8 @@ export function createOrder(input: {
       input.total,
       JSON.stringify(input.payload),
       created,
-    );
+    ],
+  );
   return {
     id,
     tenantId: input.tenantId,
@@ -93,25 +92,32 @@ export function createOrder(input: {
   };
 }
 
-export function listOrdersBySession(sessionId: string, tenantId: string): OrderRecord[] {
-  const rows = getDb()
-    .prepare(
-      'SELECT * FROM orders WHERE session_id = ? AND tenant_id = ? ORDER BY created_at DESC',
-    )
-    .all(sessionId, tenantId) as unknown as OrderRow[];
+export async function listOrdersBySession(
+  sessionId: string,
+  tenantId: string,
+): Promise<OrderRecord[]> {
+  const rows = await all<OrderRow>(
+    'SELECT * FROM orders WHERE session_id = ? AND tenant_id = ? ORDER BY created_at DESC',
+    [sessionId, tenantId],
+  );
   return rows.map(toOrder);
 }
 
-export function getOrderById(id: string, tenantId: string): OrderRecord | null {
-  const row = getDb()
-    .prepare('SELECT * FROM orders WHERE id = ? AND tenant_id = ?')
-    .get(id, tenantId) as unknown as OrderRow | undefined;
+export async function getOrderById(id: string, tenantId: string): Promise<OrderRecord | null> {
+  const row = await first<OrderRow>('SELECT * FROM orders WHERE id = ? AND tenant_id = ?', [
+    id,
+    tenantId,
+  ]);
   return row ? toOrder(row) : null;
 }
 
-export function findOrderByReference(reference: string, tenantId: string): OrderRecord | null {
-  const row = getDb()
-    .prepare('SELECT * FROM orders WHERE reference = ? AND tenant_id = ?')
-    .get(reference, tenantId) as unknown as OrderRow | undefined;
+export async function findOrderByReference(
+  reference: string,
+  tenantId: string,
+): Promise<OrderRecord | null> {
+  const row = await first<OrderRow>(
+    'SELECT * FROM orders WHERE reference = ? AND tenant_id = ?',
+    [reference, tenantId],
+  );
   return row ? toOrder(row) : null;
 }

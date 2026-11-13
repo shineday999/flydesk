@@ -11,10 +11,10 @@ export const dynamic = 'force-dynamic';
  * 直接對應到不同租戶，不必修改任何程式碼。
  */
 export default async function RootPage() {
-  ensureSeeded();
+  await ensureSeeded();
   const h = await headers();
   const host = h.get('x-forwarded-host') ?? h.get('host');
-  const tenant = resolveTenantFromHost(host) ?? defaultTenant();
+  const tenant = (await resolveTenantFromHost(host)) ?? (await defaultTenant());
 
   if (!tenant) {
     return (
