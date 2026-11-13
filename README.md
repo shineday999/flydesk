@@ -171,6 +171,7 @@ D1 schema 定義於 `migrations/0001_init.sql`，示範租戶由 `scripts/seed-d
 
 ## 文件
 
+- [`HANDOFF.md`](HANDOFF.md) — **交棒說明**：架構、已知缺陷、踩過的坑、待辦優先順序
 - [`docs/security-audit.md`](docs/security-audit.md) — OWASP Top 10 + CWE Top 25 審計與部署前清單
 - [`docs/screenshots/`](docs/screenshots/) — 前台與後台畫面
 - [`PROGRESS.md`](PROGRESS.md) — 進度與待辦
