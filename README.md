@@ -147,6 +147,18 @@ audit_log(id, tenant_id, actor, action, detail, created_at)
 
 ---
 
+## 線上 Demo
+
+| 項目 | 網址 |
+|---|---|
+| 站台 | `https://sabre.us.ci` |
+| 租戶 | `https://sabre.us.ci/t/meridian`、`https://sabre.us.ci/t/aurora` |
+| 後台 | `https://sabre.us.ci/admin` |
+
+架構：Cloudflare Tunnel → 1kw 主機上的 Next.js production server（user systemd 服務
+`flydesk.service` + `cloudflared-flydesk.service`）。部署細節見
+[`PROGRESS.md`](PROGRESS.md#八線上部署已上線)。
+
 ## 文件
 
 - [`docs/security-audit.md`](docs/security-audit.md) — OWASP Top 10 + CWE Top 25 審計與部署前清單

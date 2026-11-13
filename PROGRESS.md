@@ -149,3 +149,39 @@ npm test
   但 `/data2/hermes-profiles/tools/node-26.7.0` 內的 Node 26.7.0 **不符合**，
   若 MCP 啟動時 PATH 指到該目錄會失敗，需把該 Node 升到 26.12.1+ 或改用系統 Node。
 - craft-anything 升級完成後需重啟 MCP 伺服器才會生效。
+
+---
+
+## 八、線上部署（已上線）
+
+| 項目 | 值 |
+|---|---|
+| 網域 | `https://sabre.us.ci` |
+| 租戶入口 | `https://sabre.us.ci/t/meridian`、`/t/aurora` |
+| 後台 | `https://sabre.us.ci/admin` |
+| 架構 | Cloudflare Tunnel（zone `sabre.us.ci`，帳號 sss2020ci297）→ 1kw 主機上的 Next.js production server |
+| 應用服務 | user systemd：`flydesk.service`（`/home/abc/.config/systemd/user/flydesk.service`） |
+| 隧道服務 | user systemd：`cloudflared-flydesk.service`（設定 `/home/abc/.cloudflared/flydesk.yml`） |
+| 憑證 | `/home/abc/.config/flydesk/env`（chmod 600，含 `ADMIN_PASSWORD` / `SESSION_SECRET`） |
+| 資料庫 | `/home/abc/claude/flydesk/.data/flydesk.db`（`node:sqlite`，隨機密碼檔 600） |
+
+常用指令：
+
+```bash
+systemctl --user status flydesk.service cloudflared-flydesk.service
+journalctl --user -u flydesk.service -f
+curl -s -o /dev/null -w '%{http_code}\n' https://sabre.us.ci/t/meridian
+```
+
+### 已完成的 zone 準備
+
+1. 解除 zone 的暫停（paused）狀態 — 暫停時流量不經 Cloudflare 代理
+2. 移除原本的佔位 A 記錄（`192.0.2.1`，註記「Placeholder for Worker route」）
+3. 建立隧道 CNAME → `sabre.us.ci` 由 Cloudflare Tunnel 接手
+
+### 待辦（部署相關）
+
+- [ ] **環境變數與憑證輪替**：目前 `ADMIN_PASSWORD` / `SESSION_SECRET` 為自動產生，應納入密碼管理
+- [ ] **備份策略**：`flydesk.db` 目前無排程備份（可用 `sqlite3 .backup` + cron）
+- [ ] **主機依賴**：站台由 1kw 主機提供，主機離線時網域即不可用；若要全天候邊緣部署，需把資料層遷移至 D1 並改用 Pages/Workers 部署
+- [ ] **zone 狀態**：解除暫停後需確認 DNS 代理與 SSL 憑證續期正常
