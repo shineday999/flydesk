@@ -4,7 +4,7 @@
 //
 // 用法：node scripts/build-handoff-pack.mjs
 // 產出：FLYDESK-HANDOFF-PACK.md（單檔）與 FLYDESK-HANDOFF-PACK.zip（目錄樹版）
-import { readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, statSync, mkdirSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -128,3 +128,26 @@ ${files.map(f => `- \`${f}\``).join('\n')}
 
 writeFileSync(OUT, head + docs + '\n---\n\n## Part 2 — 完整原始碼\n' + code + foot);
 console.log('written', OUT);
+
+// 同時產生 zip 版（保留目錄樹，供需要按路徑定位檔案的接手者）
+const ZIP = OUT.replace(/\.md$/, '.zip');
+try {
+  const { execFileSync } = await import('node:child_process');
+  const { mkdtempSync, cpSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const stage = mkdtempSync(join(tmpdir(), 'flydesk-pack-'));
+  const dir = join(stage, 'flydesk');
+  mkdirSync(dir, { recursive: true });
+  for (const f of files) {
+    const dest = join(dir, f);
+    mkdirSync(join(dest, '..'), { recursive: true });
+    cpSync(join(ROOT, f), dest);
+  }
+  cpSync(join(ROOT, 'docs'), join(dir, 'docs'), { recursive: true });
+  cpSync(OUT, join(stage, OUT.split('/').pop()));
+  execFileSync('zip', ['-qr', ZIP, '.'], { cwd: stage });
+  rmSync(stage, { recursive: true, force: true });
+  console.log('written', ZIP);
+} catch (err) {
+  console.warn('zip 未產生（需要 zip 指令）：', err.message);
+}
