@@ -87,6 +87,8 @@ export async function createAdminSession(user: string, ip: string | null): Promi
     'INSERT INTO admin_sessions (id, user, ip, created_at, expires_at) VALUES (?, ?, ?, ?, ?)',
     [id, user, ip, new Date(now).toISOString(), new Date(now + SESSION_TTL_MS).toISOString()],
   );
+  // 順手清掉已過期的後台 session（登入很少發生，成本可忽略）。
+  await run('DELETE FROM admin_sessions WHERE expires_at < ?', [new Date(now).toISOString()]);
   return `${id}.${await hmacHex(secret(), id)}`;
 }
 

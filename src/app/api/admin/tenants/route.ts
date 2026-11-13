@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 import { SESSION_COOKIE, verifyAdminSession } from '@/lib/auth';
 import { fail, isSameOrigin, json } from '@/lib/http';
-import { createTenant, ensureSeeded, listTenants, writeAudit } from '@/lib/tenants';
+import { createTenant, ensureSeeded, getTenantByDomain, listTenants, writeAudit } from '@/lib/tenants';
 import { clampText, normalizeConfig } from '@/lib/config';
 
 export const dynamic = 'force-dynamic';
@@ -39,13 +39,31 @@ export async function POST(req: Request) {
   const existing = (await listTenants()).find((t) => t.slug === slug);
   if (existing) return fail('SLUG_TAKEN', 409);
 
-  const tenant = await createTenant({
-    slug,
-    name,
-    domain: clampText(body.domain, 120, '') || null,
-    plan: clampText(body.plan, 20, 'demo'),
-    config: normalizeConfig(body.config),
-  });
+  // 網域：只接受小寫主機名稱（不含協定、路徑、連接埠），且不得與其他租戶重複。
+  const domain = clampText(body.domain, 120, '').toLowerCase();
+  if (domain) {
+    if (!/^(?=.{1,120}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/.test(domain)) {
+      return fail('INVALID_DOMAIN', 400, 'Domain must be a bare hostname like shop.example.com');
+    }
+    if (await getTenantByDomain(domain)) return fail('DOMAIN_TAKEN', 409);
+  }
+
+  let tenant;
+  try {
+    tenant = await createTenant({
+      slug,
+      name,
+      domain: domain || null,
+      plan: clampText(body.plan, 20, 'demo'),
+      config: normalizeConfig(body.config),
+    });
+  } catch (err) {
+    // 檢查與寫入之間若有並行請求搶先建立，資料庫的 UNIQUE 會擋下，這裡回 409 而非 500。
+    if (err instanceof Error && /UNIQUE|constraint/i.test(err.message)) {
+      return fail('SLUG_TAKEN', 409);
+    }
+    throw err;
+  }
 
   await writeAudit(tenant.id, user, 'tenant.create', `slug=${tenant.slug}`);
   return json({ tenant }, { status: 201 });

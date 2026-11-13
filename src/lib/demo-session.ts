@@ -32,6 +32,10 @@ export async function createDemoSession(
       new Date(now + TTL_MS).toISOString(),
     ],
   );
+  // 約每 20 次建立一次，順手清掉已過期的示範 session，避免資料表無限成長。
+  if (bytes[0] % 20 === 0) {
+    await run('DELETE FROM demo_sessions WHERE expires_at < ?', [new Date(now).toISOString()]);
+  }
   return id;
 }
 

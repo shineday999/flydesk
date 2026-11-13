@@ -745,15 +745,14 @@ wrangler 4 會從 cwd 向上找 `json→jsonc→toml`。`/home/abc/wrangler.json
 | 中 | `clientIp()` 直接信任 `x-forwarded-for` 第一段，攻擊者可隨意偽造，繞過登入與下單的速率限制 | 優先使用 Cloudflare 提供的 `cf-connecting-ip`，其餘僅作本機開發備援 |
 | 中 | `auth.ts` 讀 `globalThis.env`，`db.ts` 讀 `cloudflare:workers` 的 `env`。Workers 上前者不存在，可能出現啟動檢查通過、登入卻讀不到 `ADMIN_PASSWORD` | `auth.ts` 改讀同一個 `env` 來源（保留 `process.env` 備援） |
 | 中 | 訂單編號僅 6 碼（約 2^30），可被枚舉；`POST /api/orders` 未驗證日期、行程類型、人數與旅客必填欄位 | 編號改為 10 碼（約 2^50，舊編號仍可查）；下單改用與航班搜尋相同的 `validateSearch()`，並要求姓名、電話、有效 Email |
+| 低 | 過期的 `admin_sessions`／`demo_sessions` 只在被讀取時才刪除；建立租戶時網域未驗證格式與唯一性，slug 競態會回 500 | 登入時清過期後台 session、建立示範 session 時約 1/20 機率清理；網域限定為合法主機名稱且不得重複；slug 競態改回 409 |
 
 ### 尚未處理（需要決策）
 
 - **速率限制為單一 isolate 的記憶體計數**：Workers 會有多個 isolate，實際上限遠高於設定值。正式上線應改用 Durable Object、KV 或 Cloudflare WAF 規則。
 - **旅客護照以明文存入 D1**；示範用途可接受，接真實訂單前需加密或不存。
-- **過期的 `admin_sessions`／`demo_sessions` 只在被讀取時才刪除**，無定期清理，資料表會持續成長。
 - **`npm audit --omit=dev`**：7 項（1 高、6 中），根源為 `next` 內建的 `postcss <= 8.5.22`；修復需升級到 `next@16`（破壞性變更），需另行評估。
 - **CSP 含 `script-src 'unsafe-inline'`**，削弱 XSS 防護。
-- 建立租戶時 `domain` 未驗證格式與唯一性，slug 檢查與寫入之間有競態（資料庫 `UNIQUE` 會擋下，但會回 500 而非 409）。
 - 本文件先前的描述與程式不符：session cookie 一律 `Secure`（非僅 production）、比對函式為 `safeEqual`（非 `timingSafeEqual`）。
 
 
