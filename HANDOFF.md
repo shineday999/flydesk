@@ -1,3 +1,6 @@
+> **本檔內容已合併至 [`FLYDESK.md`](FLYDESK.md)（單一權威交棒文件）。**
+> 維護時兩邊都要更新；若有衝突以 `FLYDESK.md` 為準。
+
 # Flydesk 專案交棒說明
 
 > 給接手後續作業的 AI／開發者。寫於 2026-11-13。
@@ -323,8 +326,8 @@ Referrer-Policy / Permissions-Policy / Cross-Origin-Opener-Policy）；
    （構思可行性 → 設計規劃含 TDD → 開發驗證 → 部署前審計）。
    **部署前必須通過 OWASP Top 10 + CWE Top 25 安全審計（含不適用項說明）**，
    審計文件在 `docs/security-audit.md`，改動安全相關行為時要同步更新那份文件。
-2. **原始碼禁止留痕**：本專案是從零撰寫的獨立實作，**不得在任何檔案、註解、commit message
-   中留下「從某參考站克隆／逆向」的痕跡**。已全專案 grep 確認乾淨，改動時請維持。
+2. **原始碼禁止留痕**：本專案為從零撰寫的獨立實作。**檔案、註解與 commit message 只描述本專案
+   自身的設計與決策，不提及任何其他站台的來源**。已全專案 grep 確認乾淨，改動時請維持。
 3. **不要 commit 憑證**：`.dev.vars` 已 gitignore。程式碼裡不得出現任何預設憑證值
    （`ADMIN_PASSWORD` / `SESSION_SECRET` 缺任一就拒絕啟動，這是刻意設計）。
 4. **改 `src/lib/schema.ts` 後要重產 migration**：`npm run d1:migration`，

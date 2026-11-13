@@ -1,8 +1,12 @@
+> **本檔內容已合併至 [`FLYDESK.md`](FLYDESK.md)（單一權威交棒文件）。**
+> 維護時兩邊都要更新；若有衝突以 `FLYDESK.md` 為準。
+
 # 工作進度與待辦事項
 
 > 最後更新：2026-11-13
 > 專案：`/home/abc/claude/flydesk`（Flydesk — 多租戶白標訂票 SaaS）
-> 狀態：**核心功能完成並實測通過；文件補完與部署尚未進行。**
+> 狀態：**核心功能完成並實測通過；已遷移至 Cloudflare Workers + D1 並上線。**
+> 完整交棒內容請見 [`FLYDESK.md`](FLYDESK.md)。
 
 ---
 
