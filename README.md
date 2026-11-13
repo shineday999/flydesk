@@ -21,6 +21,8 @@ Flydesk 把「訂票系統」拆成兩層：
 ## 快速開始
 
 ```bash
+git clone https://github.com/shineday999/flydesk.git
+cd flydesk
 npm install
 npm run dev          # http://localhost:4310（workerd + 本機 D1）
 ```
@@ -170,7 +172,9 @@ D1 schema 定義於 `migrations/0001_init.sql`，示範租戶由 `scripts/seed-d
 | 後台 | `https://sabre.us.ci/admin` |
 
 架構：Cloudflare Workers（vinext 建置）→ D1，站台由 Cloudflare 邊緣提供，
-不依賴任何自家主機。部署細節見 [`PROGRESS.md`](PROGRESS.md#八線上部署已上線)。
+不依賴任何自家主機。部署細節見 [`FLYDESK.md`](FLYDESK.md#7-部署與維運)。
+
+原始碼：`https://github.com/shineday999/flydesk.git`（私有，獨立 repo）。
 
 ## 文件
 

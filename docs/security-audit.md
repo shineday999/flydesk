@@ -3,7 +3,7 @@
 
 # 安全審計報告
 
-- 專案：Flydesk（多租戶白標訂票 SaaS）
+- 專案：Flydesk（多租戶白標訂票 SaaS）— `https://github.com/shineday999/flydesk.git`
 - 審計日期：2026-11-13
 - 範圍：`flydesk/src/**`（前端、API、資料層、後台）、`next.config.ts`
 - 基準：**OWASP Top 10 (2021)** + **CWE Top 25 (2023)**

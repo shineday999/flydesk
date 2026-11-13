@@ -279,8 +279,9 @@ journalctl --user -u flydesk-healthcheck.service -n 20
 
 ### 本輪產出
 
-- commit `ad82587`（`feat(flydesk): 遷移至 Cloudflare Workers + D1`）已推送至
-  `feat/flydesk-multi-tenant-saas`
-- PR #1 說明已改寫為 Workers + D1 架構（含線上實測結果）
+- 遷移 commit（抽出獨立 repo 後為 `f9e6b30`，原 monorepo 為 `ad82587`）
+- 2026-11-13 專案已從 monorepo `shineday999/claude-workspace` 抽出為**獨立 repo**
+  `https://github.com/shineday999/flydesk.git`（private），原 PR #1 已關閉。
+  抽取方式：`git subtree split --prefix=flydesk`（8 筆歷史完整保留，hash 因改寫而變動）
 - 線上版本：`401a7171-e70e-4f6b-aec9-bdb9b6869291`
 

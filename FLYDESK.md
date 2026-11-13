@@ -32,9 +32,9 @@
 | 項目 | 值 |
 |---|---|
 | 專案根目錄 | `/home/abc/claude/flydesk` |
-| Git repo | `https://github.com/shineday999/claude-workspace.git`（**monorepo**，flydesk 是其中一個子目錄） |
-| 分支 | `feat/flydesk-multi-tenant-saas`（已推送到 origin） |
-| PR | https://github.com/shineday999/claude-workspace/pull/1 （MERGEABLE / CLEAN，**此 repo 沒設 CI workflow，所以沒有 checks**） |
+| Git repo | `https://github.com/shineday999/flydesk.git`（**獨立 repo**，私有） |
+| 分支 | `main`（單一分支，直接推 main） |
+| 歷史沿革 | 2026-11-13 從 monorepo `shineday999/claude-workspace` 抽出獨立；原 PR #1 已關閉 |
 | 線上站台 | `https://sabre.us.ci` |
 | 租戶入口 | `https://sabre.us.ci/t/meridian`、`https://sabre.us.ci/t/aurora` |
 | 後台 | `https://sabre.us.ci/admin` |
@@ -57,6 +57,8 @@
 
 ```
 /home/abc/claude/flydesk/          ← 專案根目錄（cd 進來就在這裡）
+                                      ★ 這就是獨立 repo 的根，自己有 .git
+
 ├── package.json                  npm scripts 都在這（dev/build/deploy/test/typecheck）
 ├── cloudflare.config.ts          ★ Worker + D1 + secret binding 的唯一正式宣告處
 ├── vite.config.ts                Vite（@cloudflare/vite-plugin + vinext）
@@ -746,7 +748,7 @@ wrangler 4 會從 cwd 向上找 `json→jsonc→toml`。`/home/abc/wrangler.json
 5. **改 `mergeConfig()` 後必跑 `npm test`**：有單元測試專門把關陣列整份替換的語意。
 6. **部署後一定要實測**：部署成功 ≠ 功能正常。先 `curl` 各路由，再跑一次線上端到端
    （搜尋 → 下單 → cookie → 訂單列表 → 跨租戶隔離），見 §10。
-7. **改完要 commit 並推送**到 `feat/flydesk-multi-tenant-saas`，PR #1 的說明要同步更新。
+7. **改完要 commit 並推送**到本 repo 的 `main`。本 repo 是獨立 repo，不再依賴外部 PR 流程。
 8. **本機與線上是同一套程式碼**：沒有 staging 環境。本機 D1 與線上 D1 是不同資料庫，
    線上資料只有備份可回灌。
 
@@ -782,16 +784,35 @@ wrangler 4 會從 cwd 向上找 `json→jsonc→toml`。`/home/abc/wrangler.json
 
 | Commit | 內容 |
 |---|---|
-| `f2ef50b` | 多租戶白標訂票 SaaS 初始實作 |
-| `908f48b` | production 缺少憑證時拒絕啟動 |
-| `eb6ec9d` | 記錄 sabre.us.ci 線上部署方式與 zone 準備過程 |
-| `ad82587` | 遷移至 Cloudflare Workers + D1 |
-| `342084d` | 記錄 Workers + D1 遷移收尾成果與產出 |
-| `418c63d` | 補上 D1 備份還原流程並實測驗證 |
-| `e362f06` | 新增 HANDOFF.md 專案交棒說明 |
-| （本檔） | 四份文件合併為單一交棒文件 |
+| `a1ebfaa` | 多租戶白標訂票 SaaS 初始實作 |
+| `4fccc4d` | production 缺少憑證時拒絕啟動 |
+| `9dd6146` | 記錄 sabre.us.ci 線上部署方式與 zone 準備過程 |
+| `f9e6b30` | 遷移至 Cloudflare Workers + D1 |
+| `ea25b00` | 記錄 Workers + D1 遷移收尾成果與產出 |
+| `7ce6aa8` | 補上 D1 備份還原流程並實測驗證 |
+| `c7655be` | 新增 HANDOFF.md 專案交棒說明 |
+| `5f28a37` | 四份文件合併為單一交棒文件 FLYDESK.md |
+| （最新） | 抽出為獨立 repo，更新文件中的 repo 資訊 |
+
+> 這些 hash 是**抽出獨立 repo 後**的版本（`git subtree split --prefix=flydesk` 會改寫 commit hash）。
+> 在原 monorepo 中對應的 hash 為 `f2ef50b / 908f48b / eb6ec9d / ad82587 / 342084d / 418c63d / e362f06 / 687ce56`。
 
 線上版本：`401a7171-e70e-4f6b-aec9-bdb9b6869291`
+
+### 從 monorepo 抽出的過程
+
+2026-11-13 專案從 `shineday999/claude-workspace`（多專案共用一個 repo）抽出為獨立 repo：
+
+```bash
+# 在 monorepo 根目錄
+git subtree split --prefix=flydesk -b flydesk-standalone   # 保留 8 筆歷史，檔案移到根目錄
+cd flydesk && git init -b main && git fetch /home/abc/claude flydesk-standalone
+git reset --hard FETCH_HEAD
+gh repo create shineday999/flydesk --private --source=. --remote=origin --push
+```
+
+monorepo 端則是把 `flydesk/` 加進 `.gitignore`（`main` 從未合併過 flydesk，所以只需忽略目錄，
+monorepo 的 git 歷史仍保留全部紀錄），並關閉原 PR #1。
 
 ### Connector 更新狀態
 
