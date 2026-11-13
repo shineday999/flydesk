@@ -252,6 +252,12 @@ journalctl --user -u flydesk-healthcheck.service -n 20
 
 ### 尚未完成
 
-- 變更（commit + push + 更新 PR #1）
 - 上面「待辦（部署相關）」四項
+
+### 本輪產出
+
+- commit `ad82587`（`feat(flydesk): 遷移至 Cloudflare Workers + D1`）已推送至
+  `feat/flydesk-multi-tenant-saas`
+- PR #1 說明已改寫為 Workers + D1 架構（含線上實測結果）
+- 線上版本：`401a7171-e70e-4f6b-aec9-bdb9b6869291`
 
