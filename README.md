@@ -53,6 +53,7 @@ wrangler secret put SESSION_SECRET --name flydesk
 | `npm run typecheck` | TypeScript 檢查 |
 | `npm run cf:types` | 產生 Workers 型別（`.cloudflare/types`） |
 | `npm run d1:schema` / `npm run d1:seed` | 套用 D1 schema / 寫入示範租戶 |
+| `scripts/restore-d1.sh` | 把備份匯入本機 D1 並對照線上筆數（災難復原演練） |
 
 ---
 

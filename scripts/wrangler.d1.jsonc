@@ -1,0 +1,21 @@
+{
+  // 僅供 wrangler CLI 存取 D1 的輔助設定檔（正式設定在 cloudflare.config.ts）。
+  //
+  // 原因：wrangler 的 `--local`（本機 D1）必須在 wrangler 設定檔中找到
+  // d1_databases 宣告才能定位本機 state；專案本身以 cloudflare.config.ts
+  // 宣告綁定，wrangler CLI 不會讀取該格式，因此需要這份獨立設定。
+  //
+  // 用法：
+  //   wrangler d1 execute DB --local --config scripts/wrangler.d1.jsonc --file=backup.sql
+  //   wrangler d1 execute DB --local --config scripts/wrangler.d1.jsonc --command "SELECT ..."
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  "name": "flydesk",
+  "compatibility_date": "2026-11-13",
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "flydesk",
+      "database_id": "f47a080d-6f80-4795-b231-fa85e9b1914e"
+    }
+  ]
+}

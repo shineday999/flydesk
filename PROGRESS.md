@@ -217,9 +217,28 @@ journalctl --user -u flydesk-healthcheck.service -n 20
 ### 待辦（部署相關）
 
 - [ ] **憑證輪替**：目前 `ADMIN_PASSWORD` / `SESSION_SECRET` 為自動產生，應納入密碼管理與定期輪替
-- [ ] **D1 備份保留驗證**：已加入每日匯出，尚未驗證還原流程
+- [x] **D1 備份還原流程驗證**：已實測還原（2026-11-13），流程與踩到的坑見下節
 - [ ] **速率限制跨實例化**：目前為記憶體實作（見 `src/lib/http.ts`），Workers 多實例下需改用 KV／Durable Object
 - [ ] **監控告警**：健康檢查僅寫 journal，尚未接通知管道
+
+### D1 備份與還原（已實測）
+
+| 項目 | 內容 |
+|---|---|
+| 排程 | `flydesk-backup.timer`（每日 03:30），腳本 `/home/abc/.config/flydesk/backup-d1.mjs` → `wrangler d1 export flydesk --remote`，保留 14 份於 `/home/abc/.flydesk-backups` |
+| 還原 | `flydesk/scripts/restore-d1.sh`（匯入本機 D1 並對照線上筆數） |
+| 輔助設定 | `flydesk/scripts/wrangler.d1.jsonc` |
+
+**踩到的兩個坑**
+
+1. 專案以 `cloudflare.config.ts` 宣告綁定，**wrangler CLI 不讀這個格式**；`--remote` 可用
+   資料庫名稱指定，但 `--local` 必須在 wrangler 設定檔中找到 `d1_databases` 宣告，
+   否則直接報「Couldn't find a D1 DB …」。因此另備 `scripts/wrangler.d1.jsonc`。
+2. `wrangler d1 execute --local` 的 state 落在**設定檔所在目錄**旁（`scripts/.wrangler/state`），
+   不是專案根目錄。重複匯入會撞「table already exists」。還原腳本改用
+   `--persist-to scripts/.wrangler-d1-restore` 並在匯入前清空，確保可重複執行。
+
+**驗證結果**：備份檔匯入本機後，租戶 2／訂單 2／稽核 4／工作階段 2，與線上遠端 D1 完全一致。
 
 ---
 

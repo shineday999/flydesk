@@ -16,3 +16,7 @@ tsconfig.tsbuildinfo
 .cloudflare/
 .vinext/
 dist/
+
+# wrangler CLI 的本機 D1 state（還原驗證用）
+scripts/.wrangler/
+scripts/.wrangler-d1-restore/
