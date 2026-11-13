@@ -24,3 +24,6 @@ scripts/.wrangler-d1-restore/
 # 產生的交棒包（用 scripts/build-handoff-pack.mjs 重產）
 FLYDESK-HANDOFF-PACK.md
 FLYDESK-HANDOFF-PACK.zip
+
+# 外部送來的 review patch（原始碼已套用成 commit，保留作為來源紀錄）
+flydesk-review-fixes.patch
