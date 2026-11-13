@@ -1,0 +1,323 @@
+/* ==========================================================================
+   Flydesk 後台（admin）— 深色、密度高、單屏可操作
+   ========================================================================== */
+
+.adm-body {
+  background: var(--adm-bg);
+  color: var(--adm-fg);
+  min-height: 100vh;
+  font-family: 'Inter', 'Noto Sans TC', system-ui, -apple-system, sans-serif;
+}
+
+.adm-shell {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 18px 20px 60px;
+}
+
+.adm-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--adm-border);
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.adm-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.adm-logo span {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--adm-accent);
+  color: #08101d;
+  font-size: 15px;
+}
+
+.adm-nav {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.adm-link {
+  padding: 7px 12px;
+  border-radius: 9px;
+  color: var(--adm-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.adm-link:hover {
+  background: var(--adm-surface-2);
+  color: var(--adm-fg);
+}
+
+.adm-link.active {
+  background: var(--adm-surface-2);
+  color: var(--adm-fg);
+}
+
+.adm-card {
+  background: var(--adm-surface);
+  border: 1px solid var(--adm-border);
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.adm-card + .adm-card {
+  margin-top: 14px;
+}
+
+.adm-title {
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.adm-sub {
+  font-size: 12.5px;
+  color: var(--adm-muted);
+  margin-top: 3px;
+}
+
+.adm-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+}
+
+.adm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+
+.adm-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--adm-muted);
+}
+
+.adm-input,
+.adm-select {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--adm-border);
+  background: var(--adm-surface-2);
+  color: var(--adm-fg);
+  outline: none;
+  min-width: 0;
+}
+
+.adm-input:focus,
+.adm-select:focus {
+  border-color: var(--adm-accent);
+  box-shadow: 0 0 0 3px rgba(91, 156, 255, 0.18);
+}
+
+.adm-color {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.adm-color input[type='color'] {
+  width: 34px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid var(--adm-border);
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+}
+
+.adm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 14px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: var(--adm-accent);
+  color: #08101d;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.adm-btn:hover {
+  filter: brightness(1.08);
+}
+
+.adm-btn.ghost {
+  background: transparent;
+  color: var(--adm-fg);
+  border-color: var(--adm-border);
+}
+
+.adm-btn.ghost:hover {
+  background: var(--adm-surface-2);
+}
+
+.adm-btn.danger {
+  background: transparent;
+  color: var(--adm-danger);
+  border-color: rgba(242, 109, 109, 0.4);
+}
+
+.adm-btn.sm {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.adm-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--adm-border);
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+}
+
+.adm-tab {
+  padding: 7px 13px;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--adm-muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.adm-tab[aria-selected='true'] {
+  background: var(--adm-surface-2);
+  border-color: var(--adm-border);
+  color: var(--adm-fg);
+}
+
+.adm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.adm-table th,
+.adm-table td {
+  text-align: left;
+  padding: 10px 10px;
+  border-bottom: 1px solid var(--adm-border);
+  vertical-align: middle;
+}
+
+.adm-table th {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--adm-muted);
+}
+
+.adm-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--adm-border);
+  flex-wrap: wrap;
+}
+
+.adm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 700;
+  background: rgba(63, 185, 132, 0.14);
+  color: var(--adm-ok);
+}
+
+.adm-chip.off {
+  background: rgba(147, 161, 177, 0.14);
+  color: var(--adm-muted);
+}
+
+.adm-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.adm-preview {
+  width: 100%;
+  height: 520px;
+  border: 1px solid var(--adm-border);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.adm-toast {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 60;
+  padding: 11px 16px;
+  border-radius: 11px;
+  background: var(--adm-surface-2);
+  border: 1px solid var(--adm-border);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.adm-toast.err {
+  border-color: rgba(242, 109, 109, 0.5);
+  color: var(--adm-danger);
+}
+
+.adm-toast.ok {
+  border-color: rgba(63, 185, 132, 0.5);
+  color: var(--adm-ok);
+}
+
+.adm-login {
+  max-width: 380px;
+  margin: 14vh auto 0;
+}
+
+.adm-stat {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.adm-muted {
+  color: var(--adm-muted);
+  font-size: 12.5px;
+}
+
+.adm-inline-list {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
