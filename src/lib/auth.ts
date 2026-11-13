@@ -1,5 +1,6 @@
 import { env as workersEnv } from 'cloudflare:workers';
 import { first, nowIso, run } from './db';
+import { SCHEMA_STATEMENTS } from './schema';
 
 /**
  * 後台驗證。
@@ -127,3 +128,59 @@ export function adminCookieOptions() {
 }
 
 export { SESSION_COOKIE, nowIso };
+
+
+/* ------------------------------------------------------------------ *
+ * 登入失敗限流（存在 D1，跨 isolate 共用）
+ *
+ * 記憶體計數在 Workers 上每個 isolate 各算各的，擋不住暴力破解。這裡把「失敗」
+ * 寫進 D1：每個 IP 10 分鐘內最多 5 次失敗，全站 10 分鐘內最多 40 次失敗
+ * （分散式猜密碼的總量上限）。被擋住時只讀不寫，攻擊者無法藉此灌爆 D1 寫入額度。
+ * ------------------------------------------------------------------ */
+
+const LOGIN_WINDOW_MS = 10 * 60 * 1000;
+const LOGIN_MAX_PER_IP = 5;
+const LOGIN_MAX_GLOBAL = 40;
+
+let loginTablePromise: Promise<void> | null = null;
+
+/** 既有資料庫可能是在這張表加入之前建立的，所以這裡獨立確保它存在。 */
+function ensureLoginTable(): Promise<void> {
+  if (!loginTablePromise) {
+    const stmts = SCHEMA_STATEMENTS.filter((q) => q.includes('login_failures'));
+    loginTablePromise = (async () => {
+      for (const q of stmts) await run(q);
+    })().catch((err) => {
+      loginTablePromise = null;
+      throw err;
+    });
+  }
+  return loginTablePromise;
+}
+
+export async function isLoginBlocked(ip: string): Promise<boolean> {
+  await ensureLoginTable();
+  const since = Date.now() - LOGIN_WINDOW_MS;
+  const perIp = await first<{ n: number }>(
+    'SELECT COUNT(*) AS n FROM login_failures WHERE ip = ? AND at > ?',
+    [ip, since],
+  );
+  if ((perIp?.n ?? 0) >= LOGIN_MAX_PER_IP) return true;
+  const total = await first<{ n: number }>(
+    'SELECT COUNT(*) AS n FROM login_failures WHERE at > ?',
+    [since],
+  );
+  return (total?.n ?? 0) >= LOGIN_MAX_GLOBAL;
+}
+
+export async function recordLoginFailure(ip: string): Promise<void> {
+  await ensureLoginTable();
+  const now = Date.now();
+  await run('INSERT INTO login_failures (ip, at) VALUES (?, ?)', [ip, now]);
+  await run('DELETE FROM login_failures WHERE at < ?', [now - LOGIN_WINDOW_MS]);
+}
+
+export async function clearLoginFailures(ip: string): Promise<void> {
+  await ensureLoginTable();
+  await run('DELETE FROM login_failures WHERE ip = ?', [ip]);
+}

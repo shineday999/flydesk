@@ -746,12 +746,13 @@ wrangler 4 會從 cwd 向上找 `json→jsonc→toml`。`/home/abc/wrangler.json
 | 中 | `auth.ts` 讀 `globalThis.env`，`db.ts` 讀 `cloudflare:workers` 的 `env`。Workers 上前者不存在，可能出現啟動檢查通過、登入卻讀不到 `ADMIN_PASSWORD` | `auth.ts` 改讀同一個 `env` 來源（保留 `process.env` 備援） |
 | 中 | 訂單編號僅 6 碼（約 2^30），可被枚舉；`POST /api/orders` 未驗證日期、行程類型、人數與旅客必填欄位 | 編號改為 10 碼（約 2^50，舊編號仍可查）；下單改用與航班搜尋相同的 `validateSearch()`，並要求姓名、電話、有效 Email |
 | 低 | 過期的 `admin_sessions`／`demo_sessions` 只在被讀取時才刪除；建立租戶時網域未驗證格式與唯一性，slug 競態會回 500 | 登入時清過期後台 session、建立示範 session 時約 1/20 機率清理；網域限定為合法主機名稱且不得重複；slug 競態改回 409 |
+| 高 | 後台登入暴力破解：限流只在記憶體，Workers 多 isolate 下形同無效 | 登入失敗寫入 D1 `login_failures`：每 IP 10 分鐘 5 次、全站 10 分鐘 40 次；被擋時只讀不寫，避免灌爆 D1 寫入額度。取捨：全站上限被打滿時管理員也會被鎖 10 分鐘 |
+| 高 | `npm audit --omit=dev` 7 項（1 高 6 中）：`next` 內建 `postcss <= 8.5.22`、`satori` 的 `fflate` | `package.json` 加 `overrides`（`postcss ^8.5.32`、`fflate ^0.8.2`），audit 歸零；型別檢查、測試、`npm run build` 皆通過 |
 
 ### 尚未處理（需要決策）
 
-- **速率限制為單一 isolate 的記憶體計數**：Workers 會有多個 isolate，實際上限遠高於設定值。正式上線應改用 Durable Object、KV 或 Cloudflare WAF 規則。
+- **訂單與航班 API 的速率限制仍是單一 isolate 的記憶體計數**：Workers 上實際上限會被稀釋。這兩個端點風險較低（編號已加長、個資已遮蔽）；若要精確限流需用 Durable Object、KV 或 Cloudflare WAF 規則，可能產生費用，故未處理。
 - **旅客護照以明文存入 D1**；示範用途可接受，接真實訂單前需加密或不存。
-- **`npm audit --omit=dev`**：7 項（1 高、6 中），根源為 `next` 內建的 `postcss <= 8.5.22`；修復需升級到 `next@16`（破壞性變更），需另行評估。
 - **CSP 含 `script-src 'unsafe-inline'`**，削弱 XSS 防護。
 - 本文件先前的描述與程式不符：session cookie 一律 `Secure`（非僅 production）、比對函式為 `safeEqual`（非 `timingSafeEqual`）。
 

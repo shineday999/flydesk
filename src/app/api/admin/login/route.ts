@@ -1,4 +1,4 @@
-import { adminCookieOptions, adminPassword, createAdminSession, destroyAdminSession, hashPassword, safeEqual, verifyAdminSession, SESSION_COOKIE } from '@/lib/auth';
+import { adminCookieOptions, adminPassword, clearLoginFailures, createAdminSession, isLoginBlocked, recordLoginFailure, destroyAdminSession, hashPassword, safeEqual, verifyAdminSession, SESSION_COOKIE } from '@/lib/auth';
 import { clientIp, fail, isSameOrigin, json, rateLimit } from '@/lib/http';
 import { readCookie } from '@/lib/http';
 
@@ -13,6 +13,10 @@ export async function POST(req: Request) {
     return fail('RATE_LIMITED', 429, 'Too many attempts');
   }
 
+  if (await isLoginBlocked(ip)) {
+    return fail('RATE_LIMITED', 429, 'Too many attempts');
+  }
+
   let body: Record<string, unknown> = {};
   try {
     body = (await req.json()) as Record<string, unknown>;
@@ -24,8 +28,10 @@ export async function POST(req: Request) {
   const provided = await hashPassword(password);
   const expected = await hashPassword(adminPassword());
   if (!password || !safeEqual(provided, expected)) {
+    await recordLoginFailure(ip);
     return fail('INVALID_CREDENTIALS', 401);
   }
+  await clearLoginFailures(ip);
 
   const token = await createAdminSession('admin', ip);
   const res = json({ ok: true });

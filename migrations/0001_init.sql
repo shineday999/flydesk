@@ -43,6 +43,12 @@ CREATE TABLE IF NOT EXISTS orders (
    );
 CREATE INDEX IF NOT EXISTS idx_orders_session ON orders(session_id);
 CREATE INDEX IF NOT EXISTS idx_orders_tenant ON orders(tenant_id);
+CREATE TABLE IF NOT EXISTS login_failures (
+     id          INTEGER PRIMARY KEY AUTOINCREMENT,
+     ip          TEXT NOT NULL,
+     at          INTEGER NOT NULL
+   );
+CREATE INDEX IF NOT EXISTS idx_login_failures_ip ON login_failures(ip, at);
 CREATE TABLE IF NOT EXISTS audit_log (
      id          INTEGER PRIMARY KEY AUTOINCREMENT,
      tenant_id   TEXT,
